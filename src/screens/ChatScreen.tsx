@@ -42,7 +42,7 @@ const loadMessagesFromFirestore = async (profileId: string, conversationId: stri
 
   try {
     const db = getFirestore();
-    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const messagesRef = collection(db, 'users', profileId, 'conversations', conversationId, 'messages');
     const q = query(
       messagesRef,
       orderBy('timestamp', 'asc')
@@ -550,7 +550,7 @@ const ChatScreen = () => {
   const db = getFirestore();
   try {
     // Add user message to Firestore
-    const userMsgDoc = await addDoc(collection(db, 'users', profileId, 'messages'), userMessageData);
+    const userMsgDoc = await addDoc(collection(db, 'users', profileId, 'conversations', convId, 'messages'), userMessageData);
     const userMessage: ChatMessage = { ...userMessageData, id: userMsgDoc.id };
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
@@ -655,40 +655,42 @@ const ChatScreen = () => {
         console.error(`Inconsistent state: currentConversation is null, yet somehow its ID was considered matching ${returnedConversationId}. Re-fetching conversation.`);
         // As a robust fallback, try to fetch the conversation as if it were new/different.
         const db = getFirestore();
-        try {
-  const conversationDocRef = doc(db, 'users', profileId, 'conversations', returnedConversationId);
-  const conversationDocSnap = await getDoc(conversationDocRef);
-  if (conversationDocSnap.exists()) {
-    const conversationData = conversationDocSnap.data();
-    const updatedConv: Conversation = {
-      id: conversationDocSnap.id,
-      title: conversationData.title || `Chat (${returnedConversationId.substring(0,5)})`,
-      lastMessage: aiMessage.text,
-      timestamp: aiMessage.timestamp,
-      personalityId: aiMessage.personalityId,
-    };
-    setCurrentConversation(updatedConv);
-  } else {
-    const updatedConv: Conversation = {
-      id: returnedConversationId,
-      title: `Chat (${returnedConversationId.substring(0,5)})`,
-      lastMessage: aiMessage.text,
-      timestamp: aiMessage.timestamp,
-      personalityId: aiMessage.personalityId,
-    };
-    setCurrentConversation(updatedConv);
-  }
-} catch (fetchError) {
-  console.error('Error re-fetching conversation during inconsistent state:', fetchError);
-  const updatedConv: Conversation = {
-    id: returnedConversationId,
-    title: `Chat (${returnedConversationId.substring(0,5)})`,
-    lastMessage: aiMessage.text,
-    timestamp: aiMessage.timestamp,
-    personalityId: aiMessage.personalityId,
-  };
-  setCurrentConversation(updatedConv);
-}
+        await (async () => {
+          try {
+            const conversationDocRef = doc(db, 'users', profileId, 'conversations', returnedConversationId);
+            const conversationDocSnap = await getDoc(conversationDocRef);
+            if (conversationDocSnap.exists()) {
+              const conversationData = conversationDocSnap.data();
+              const updatedConv: Conversation = {
+                id: conversationDocSnap.id,
+                title: conversationData.title || `Chat (${returnedConversationId.substring(0,5)})`,
+                lastMessage: aiMessage.text,
+                timestamp: aiMessage.timestamp,
+                personalityId: aiMessage.personalityId,
+              };
+              setCurrentConversation(updatedConv);
+            } else {
+               const updatedConv: Conversation = {
+                  id: returnedConversationId,
+                  title: `Chat (${returnedConversationId.substring(0,5)})`,
+                  lastMessage: aiMessage.text,
+                  timestamp: aiMessage.timestamp,
+                  personalityId: aiMessage.personalityId,
+                };
+              setCurrentConversation(updatedConv);
+            }
+          } catch (fetchError) {
+            console.error('Error re-fetching conversation during inconsistent state:', fetchError);
+            const updatedConv: Conversation = {
+              id: returnedConversationId,
+              title: `Chat (${returnedConversationId.substring(0,5)})`,
+              lastMessage: aiMessage.text,
+              timestamp: aiMessage.timestamp,
+              personalityId: aiMessage.personalityId,
+            };
+            setCurrentConversation(updatedConv);
+          }
+        })();
       }
     } else {
       // Backend call failed or returned invalid data

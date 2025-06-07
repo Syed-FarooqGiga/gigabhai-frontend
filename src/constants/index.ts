@@ -68,4 +68,4 @@ export const PERSONALITIES: Record<string, Personality> = {
   }
 };
 
-export const API_URL = 'http://127.0.0.1:8000'; 
+export const API_URL = 'https://gigabhai-backend.onrender.com';
