@@ -16,6 +16,7 @@ const AuthScreen = ({ navigation }: AuthScreenProps) => {
 
   // Handle navigation after successful authentication
   useEffect(() => {
+    console.log('AuthScreen useEffect triggered, user:', user);
     if (user) {
       // Reset the navigation stack to prevent going back to auth
       navigation.reset({
@@ -27,7 +28,14 @@ const AuthScreen = ({ navigation }: AuthScreenProps) => {
 
   const handleAuthSuccess = () => {
     console.log('Authentication successful - handleAuthSuccess called');
-    // The useEffect will handle the navigation when the user state changes
+
+    // Fallback: force navigation in case onAuthStateChanged is delayed
+    setTimeout(() => {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+    }, 500); // delay gives Firebase time to update auth state
   };
 
   if (loading) {
