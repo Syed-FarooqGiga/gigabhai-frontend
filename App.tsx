@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Navigation } from './src/navigation';
-import { AuthProvider as FirebaseAuthProvider } from './src/contexts/FirebaseAuthContext';
+import { AuthProvider } from './src/contexts/FirebaseAuthContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View } from 'react-native';
@@ -19,14 +19,14 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <FirebaseAuthProvider>
+        <AuthProvider>
           <ConversationProvider>
             <View style={{ flex: 1, minHeight: 0, height: '100%' }}>
               <Navigation />
               <Toast />
             </View>
           </ConversationProvider>
-        </FirebaseAuthProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
