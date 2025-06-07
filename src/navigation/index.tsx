@@ -69,42 +69,47 @@ const MainTabs = () => {
   );
 };
 
+const LoadingScreen = ({ isDark }: { isDark: boolean }) => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+    width: '100%',
+    backgroundColor: isDark ? '#000' : '#fff'
+  }}>
+    <div 
+      style={{
+        width: '40px',
+        height: '40px',
+        border: `3px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+        borderTopColor: isDark ? '#fff' : '#000',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+      }}
+    />
+  </div>
+);
+
 export const Navigation = () => {
   const { user, loading } = useAuth();
   const { isDark } = useTheme();
-
-  // Add a ref to track initial loading
-  const isInitialMount = React.useRef(true);
-
-  // Show a loading screen while checking auth state
-  if (loading && isInitialMount.current) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        width: '100%',
-        backgroundColor: isDark ? '#000' : '#fff'
-      }}>
-        <div 
-          style={{
-            width: '40px',
-            height: '40px',
-            border: `3px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-            borderTopColor: isDark ? '#fff' : '#000',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-          }}
-        />
-      </div>
-    );
-  }
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
 
   // Reset initial loading after first render
   React.useEffect(() => {
-    isInitialMount.current = false;
-  }, []);
+    if (!loading) {
+      const timer = setTimeout(() => {
+        setIsInitialLoading(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
+  // Show loading screen during initial load
+  if (isInitialLoading) {
+    return <LoadingScreen isDark={isDark} />;
+  }
 
   return (
     <NavigationContainer>

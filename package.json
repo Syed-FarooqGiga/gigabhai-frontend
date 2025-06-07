@@ -8,7 +8,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint . --ext .ts,.tsx",
-    "build": "expo export -p web"
+    "build": "expo export -p web",
+    "generate-favicon": "node scripts/create-large-favicon.js",
+    "prestart": "npm run generate-favicon",
+    "prebuild": "npm run generate-favicon"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.1.3",
@@ -49,6 +52,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-vector-icons": "^10.0.3",
     "react-native-web": "~0.19.6",
+    "sharp": "^0.33.3",
     "styled-components": "^6.1.18",
     "styled-system": "^5.1.5",
     "uuid": "^11.1.0"
@@ -67,12 +71,14 @@
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
     "eslint": "^9.28.0",
+    "image-size": "^2.0.2",
     "metro-minify-terser": "^0.82.3",
     "null-loader": "^4.0.1",
     "patch-package": "^8.0.0",
     "path-browserify": "^1.0.1",
     "postinstall-postinstall": "^2.1.0",
     "process": "^0.11.10",
+    "sharp": "^0.34.2",
     "stream-browserify": "^3.0.0",
     "typescript": "~5.8.3",
     "util": "^0.12.5"
