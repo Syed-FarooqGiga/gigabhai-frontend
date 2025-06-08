@@ -1054,15 +1054,51 @@ const isWeb = Platform.OS === 'web';
 const Container = !isWeb ? KeyboardAvoidingView : View;
 const keyboardVerticalOffset = Platform.OS === 'ios' ? 64 : Platform.OS === 'android' ? 0 : 0;
 
+  const [showPersonalityHint, setShowPersonalityHint] = useState(true);
+  const personalityHintDismissed = useRef(false);
+
+  // Show the hint only on first login (when profileId changes and user lands on ChatScreen)
+  useEffect(() => {
+    if (profileId) { // Only show if profileId is available
+      setShowPersonalityHint(true);
+      personalityHintDismissed.current = false;
+    }
+  }, [profileId]);
+
+  const handleDismissHint = useCallback(() => {
+    if (!personalityHintDismissed.current) {
+      setShowPersonalityHint(false);
+      personalityHintDismissed.current = true;
+    }
+  }, []);
+
 return (
   <Container
     style={[styles.container, { flex: 1 }]}
-    {...(!isWeb ? {
-      behavior: Platform.OS === 'ios' ? 'padding' : 'height',
-      keyboardVerticalOffset,
+    behavior={Platform.OS === "ios" ? "padding" : undefined}
+    keyboardVerticalOffset={Platform.OS === "ios" ? keyboardVerticalOffset : 0}
+    {...(Platform.OS === 'web' ? {
+      // @ts-ignore web only prop
+      dataSet: { "keyboard-avoiding-view-enabled": true },
       enabled: true,
     } : {})}
   >
+    {/* Personality Hint Overlay */}
+    {showPersonalityHint && (
+      <Pressable
+        style={styles.personalityHintOverlay}
+        onPress={handleDismissHint}
+        pointerEvents="box-none" // Allows taps to pass through to elements behind it if not on the box itself
+      >
+        <View style={styles.personalityHintBoxContainer} pointerEvents="box-none">
+          <View style={styles.personalityHintBox}>
+            <Text style={styles.personalityHintText}>Tap here to change personalities</Text>
+            {/* Down arrow (triangle) */}
+            <View style={styles.personalityHintArrow} />
+          </View>
+        </View>
+      </Pressable>
+    )}
        <Header onPressConversations={() => setShowHistoryModal(true)} />
        {!isOnline && (
          <View style={styles.networkStatusBar}>
@@ -1101,7 +1137,10 @@ return (
        <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'ios' ? 8 : Platform.OS === 'android' ? 4 : 0 }]}>
         <TouchableOpacity
           style={styles.personalityButton}
-          onPress={() => setShowPersonalityModal(true)}
+          onPress={(e: any) => { // Added e: any for type consistency, can be refined
+            setShowPersonalityModal(true);
+            if (showPersonalityHint) handleDismissHint();
+          }}
         >
           <MaterialCommunityIcons
             name={selectedPersonality.icon as any} // Cast as any if icon names are not strictly typed
@@ -1241,6 +1280,48 @@ return (
 };
 
 const styles = StyleSheet.create({
+  personalityHintOverlay: {
+    ...StyleSheet.absoluteFillObject, // Covers the whole screen
+    zIndex: 1000, // Ensures it's on top
+    justifyContent: 'flex-end', // Positions the hint box container towards the bottom
+    alignItems: 'flex-start', // Positions the hint box container towards the left
+  },
+  personalityHintBoxContainer: {
+    position: 'absolute',
+    // Adjust these values to position the hint box correctly relative to the personality button
+    left: 32, // Example: inputContainer paddingHorizontal (16) + personalityButton marginLeft (8) + some offset (8)
+    bottom: 68, // Example: Approximate height of input bar + small margin
+    width: 220, // Adjust as needed
+    alignItems: 'center', // Centers the arrow below the box
+  },
+  personalityHintBox: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6, // For Android shadow
+    alignItems: 'center',
+  },
+  personalityHintText: {
+    fontSize: 15,
+    color: '#3a86ff', // Using a color from your app theme
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  personalityHintArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 12,
+    borderRightWidth: 12,
+    borderTopWidth: 16,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#fff', // Arrow color should match the box background
+    marginTop: -2, // Slight overlap to make it look connected
+  },
   container: {
     flex: 1,
     minHeight: 0,
