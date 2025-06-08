@@ -13,8 +13,9 @@ export async function uploadFeedback(
 ) {
   if (!feedback.trim()) throw new Error('Feedback is empty');
   const db = getFirebaseFirestore();
-  const feedbackRef = collection(db, 'users', userInfo.profileId, 'feedback');
-  console.log('[uploadFeedback] Attempting to write to:', `users/${userInfo.profileId}/feedback`);
+  // Store feedback in a global 'feedbackindex' collection for aggregation
+  const feedbackRef = collection(db, 'feedbackindex');
+  console.log('[uploadFeedback] Attempting to write to: feedbackindex');
   console.log('[uploadFeedback] Data:', { feedback, ...userInfo });
   try {
     const docRef = await addDoc(feedbackRef, {
