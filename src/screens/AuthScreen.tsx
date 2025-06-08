@@ -6,6 +6,12 @@ import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../contexts/FirebaseAuthContext';
 import EmailAuthScreen from './EmailAuthScreen';
 
+declare global {
+  interface Window {
+    __alreadyReloadedAfterLogin?: boolean;
+  }
+}
+
 type AuthScreenProps = {
   navigation: StackNavigationProp<RootStackParamList, 'Auth'>;
 };
@@ -21,6 +27,13 @@ const AuthScreen = ({ navigation }: AuthScreenProps) => {
         index: 0,
         routes: [{ name: 'Main' }],
       });
+      // Reload the page once after login
+      if (typeof window !== 'undefined' && !window.__alreadyReloadedAfterLogin) {
+        window.__alreadyReloadedAfterLogin = true;
+        setTimeout(() => {
+          window.location.reload();
+        }, 200); // Delay to allow navigation to finish
+      }
     }
   }, [user, navigation]);
 
