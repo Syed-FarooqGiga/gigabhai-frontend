@@ -1049,20 +1049,19 @@ const ChatScreen = () => {
   }
   // Use KeyboardAvoidingView on iOS and Android (not web) to handle keyboard pop-up without blank space.
 // On web, use regular View to avoid layout bugs. On Android, use behavior='height' for best results.
+// Platform-specific KeyboardAvoidingView for iOS/Android, View for web
 const isWeb = Platform.OS === 'web';
 const Container = !isWeb ? KeyboardAvoidingView : View;
-// Fixes for mobile Chrome/Android blank space and scroll issues:
-// - Make container and FlatList flex: 1 (fill screen)
-// - FlatList contentContainerStyle uses flexGrow: 1 and justifyContent: 'flex-end'
-// - Remove extra padding/margin at bottom
-// - Header always visible at top
-// - KeyboardAvoidingView on iOS/Android, View on web
+const keyboardVerticalOffset = Platform.OS === 'ios' ? 64 : Platform.OS === 'android' ? 0 : 0;
+
 return (
   <Container
     style={[styles.container, { flex: 1 }]}
-    {...(!isWeb ? (Platform.OS === 'ios'
-      ? { behavior: 'padding', keyboardVerticalOffset: 64 }
-      : { behavior: 'height' }) : {})}
+    {...(!isWeb ? {
+      behavior: Platform.OS === 'ios' ? 'padding' : 'height',
+      keyboardVerticalOffset,
+      enabled: true,
+    } : {})}
   >
        <Header onPressConversations={() => setShowHistoryModal(true)} />
        {!isOnline && (
@@ -1099,7 +1098,7 @@ return (
              )
          )}
        />
-       <View style={[styles.inputContainer, { marginBottom: 0 }]}>
+       <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'ios' ? 8 : Platform.OS === 'android' ? 4 : 0 }]}>
         <TouchableOpacity
           style={styles.personalityButton}
           onPress={() => setShowPersonalityModal(true)}
@@ -1111,14 +1110,21 @@ return (
           />
         </TouchableOpacity>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { minHeight: 40, maxHeight: 120 }]}
           value={inputText}
           onChangeText={setInputText}
           placeholder={`Message ${selectedPersonality.name}...`}
-          placeholderTextColor={colors.textTertiary} // Use the tertiary text color for placeholders
+          placeholderTextColor={colors.textTertiary}
           multiline
           maxLength={1000}
-          editable={!isLoadingMessages && !!currentConversation} // Disable if loading or no conversation
+          editable={!isLoadingMessages && !!currentConversation}
+          blurOnSubmit={false}
+          returnKeyType="send"
+          onSubmitEditing={() => {
+            if (inputText.trim() && currentConversation) {
+              void handleSendMessage(inputText);
+            }
+          }}
         />
         <TouchableOpacity
           style={[styles.sendButton, (!inputText.trim() || isTyping || isLoadingMessages || !currentConversation) && styles.sendButtonDisabled]}
@@ -1237,6 +1243,9 @@ return (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    backgroundColor: '#fff', // Ensure background is never transparent
   },
   networkStatusBar: {
     backgroundColor: '#f8d7da',
