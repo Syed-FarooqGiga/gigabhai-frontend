@@ -152,7 +152,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
       >
         <View style={styles.formContainer}>
           <Text style={[styles.title, { color: colors.text }]}>
-            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+            {mode === 'login' ? 'Welcome to Giga BhAI' : 'Create Account'}
           </Text>
 
           {error ? (
