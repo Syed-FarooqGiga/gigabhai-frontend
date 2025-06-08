@@ -1,0 +1,26 @@
+import { getFirebaseFirestore } from '../utils/initFirebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
+/**
+ * Store feedback as a document in Firestore under users/{profileId}/feedback/{autoId}
+ * @param feedback The feedback text
+ * @param userInfo Extra user info (email, name, username, profileId)
+ * @returns The Firestore document reference
+ */
+export async function uploadFeedback(
+  feedback: string,
+  userInfo: { email: string; name: string; username: string; profileId: string }
+) {
+  if (!feedback.trim()) throw new Error('Feedback is empty');
+  const db = getFirebaseFirestore();
+  const feedbackRef = collection(db, 'users', userInfo.profileId, 'feedback');
+  const docRef = await addDoc(feedbackRef, {
+    feedback,
+    email: userInfo.email || '',
+    name: userInfo.name || '',
+    username: userInfo.username || '',
+    profileId: userInfo.profileId || '',
+    submittedAt: serverTimestamp(),
+  });
+  return docRef;
+}
