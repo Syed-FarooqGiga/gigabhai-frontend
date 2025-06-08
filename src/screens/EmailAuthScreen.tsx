@@ -80,7 +80,18 @@ const EmailAuthScreen = () => {
           throw new Error('Name and username are required');
         }
         await signUpWithEmail(email, password, name, username);
-        // Navigation will be handled by parent on auth state change
+        // Clear the form
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setName('');
+        setUsername('');
+        // Show success message
+        alert('Account created successfully! Please log in.');
+        // Switch to login mode
+        setMode('login');
+        // Force a full page reload to get a fresh login page
+        window.location.href = window.location.origin + '/login';
       }
     } catch (err: any) {
       let errorMessage = 'Authentication failed. Please try again.';
