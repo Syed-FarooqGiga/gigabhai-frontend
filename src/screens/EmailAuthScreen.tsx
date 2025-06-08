@@ -75,23 +75,20 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
         // Wait for auth state to update globally before calling onSuccess
         setTimeout(() => {
           onSuccess();
-        }, 100); // Give a short delay for context to update
-      } else {
+        }, 300); // Give a bit more delay for context to update
+      } else { // signup mode
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
         }
         if (!name.trim() || !username.trim()) {
           throw new Error('Name and username are required');
         }
-        // After successful signup, Firebase automatically logs in the user.
-        // Do NOT attempt to log in again here. Let the auth state listener handle navigation.
         await signUpWithEmail(email, password, name, username);
-        return; // Let auth listener handle redirect
-      }
-
-      // onSuccess() is now called after a short delay post-login above
-      if (mode !== 'login') {
-        onSuccess();
+        // Firebase automatically signs in the user after successful signUpWithEmail.
+        // Call onSuccess to navigate.
+        setTimeout(() => {
+          onSuccess();
+        }, 300);
       }
     } catch (err: any) {
       let errorMessage = 'Authentication failed. Please try again.';
