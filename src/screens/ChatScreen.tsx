@@ -31,6 +31,7 @@ import { useAuth } from '../hooks/useAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MessageBubble } from '../components/MessageBubble';
+import { TypingBubble } from '../components/TypingBubble';
 import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, orderBy, doc, serverTimestamp, setDoc, getDoc, onSnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 
 // Load messages from Firestore for the given conversation
@@ -40,33 +41,58 @@ const loadMessagesFromFirestore = async (profileId: string, conversationId: stri
     return [];
   }
 
+  console.log(`[loadMessagesFromFirestore] Attempting to load messages for profile: ${profileId}, conversation: ${conversationId}`);
+
   try {
     const db = getFirestore();
     const messagesRef = collection(db, 'users', profileId, 'conversations', conversationId, 'messages');
+    console.log(`[loadMessagesFromFirestore] Messages ref path: users/${profileId}/conversations/${conversationId}/messages`);
+    
     const q = query(
       messagesRef,
       orderBy('timestamp', 'asc')
     );
     
+    console.log('[loadMessagesFromFirestore] Executing Firestore query...');
     const querySnapshot = await getDocs(q);
-    const messages: ChatMessage[] = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        text: data.text,
-        userId: data.userId,
-        sender: data.sender,
-        timestamp: data.timestamp?.toDate() || new Date(),
-        conversationId: data.conversationId,
-        personalityId: data.personalityId || 'default',
-        profileId: data.profileId,
-      };
+    
+    if (querySnapshot.empty) {
+      console.log('[loadMessagesFromFirestore] No messages found in this conversation');
+      return [];
+    }
+    
+    const messages: ChatMessage[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      try {
+        const data = doc.data();
+        if (!data) {
+          console.warn(`[loadMessagesFromFirestore] Document ${doc.id} has no data`);
+          return;
+        }
+        
+        const message: ChatMessage = {
+          id: doc.id,
+          text: data.text || '',
+          userId: data.userId || 'unknown',
+          sender: data.sender || 'user',
+          timestamp: data.timestamp?.toDate() || new Date(),
+          conversationId: conversationId, // Use the passed conversationId instead of data.conversationId
+          personalityId: data.personalityId || 'default',
+          profileId: data.profileId || profileId,
+        };
+        
+        messages.push(message);
+      } catch (docError) {
+        console.error(`[loadMessagesFromFirestore] Error processing document ${doc.id}:`, docError);
+      }
     });
 
-    console.log(`[loadMessagesFromFirestore] Loaded ${messages.length} messages for conversation ${conversationId}`);
+    console.log(`[loadMessagesFromFirestore] Successfully loaded ${messages.length} messages for conversation ${conversationId}`);
     return messages;
   } catch (error) {
     console.error('[loadMessagesFromFirestore] Error loading messages:', error);
+    // Return empty array on error to prevent breaking the UI
     return [];
   }
 };
@@ -281,42 +307,112 @@ const ChatScreen = () => {
   const [profileId, setProfileId] = useState<string | null>(null);
 // (All other duplicate declarations of these variables throughout this function have been removed)
 
-  // Load messages when the conversation changes
+  // Load messages when the conversation changes and set up real-time listener
   useEffect(() => {
-    const fetchMessages = async () => {
+    let isMounted = true;
+    let unsubscribe = () => {};
+    
+    const setupMessageListener = async () => {
       if (!profileId || !currentConversation?.id) {
         console.log('[fetchMessages] Missing profileId or conversationId');
-        return;
+        if (isMounted) {
+          setMessages([]);
+        }
+        return () => {};
       }
 
-      console.log(`[fetchMessages] Loading messages for conversation: ${currentConversation.id}`);
+      console.log(`[fetchMessages] Setting up message listener for conversation: ${currentConversation.id}`);
       
       try {
+        setIsLoadingMessages(true);
+        
+        // First, load existing messages
         const firestoreMessages = await loadMessagesFromFirestore(profileId, currentConversation.id);
         
-        setMessages(prevMessagesInState => {
-          // Keep any optimistic messages that aren't yet in Firestore
-          const optimisticMessages = prevMessagesInState.filter(
-            msg => msg.conversationId === currentConversation.id && 
-                   !firestoreMessages.some(fm => fm.id === msg.id)
-          );
-
-          // Combine and sort messages
-          const combinedMessages = [...firestoreMessages, ...optimisticMessages].sort((a, b) => {
-            const tsA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-            const tsB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
-            return tsA - tsB;
+        if (!isMounted) return () => {};
+        
+        // Set initial messages from Firestore only (do not keep optimistic messages on reload)
+        setMessages(firestoreMessages);
+        
+        // Set up real-time listener for new messages
+        const db = getFirestore();
+        const messagesRef = collection(db, 'users', profileId, 'conversations', currentConversation.id, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(50));
+        
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+          if (!isMounted) return;
+          
+          const newMessages: ChatMessage[] = [];
+          querySnapshot.forEach((doc) => {
+            try {
+              const data = doc.data();
+              if (!data) return;
+              
+              newMessages.push({
+                id: doc.id,
+                text: data.text || '',
+                userId: data.userId || 'unknown',
+                sender: data.sender || 'user',
+                timestamp: data.timestamp?.toDate() || new Date(),
+                conversationId: currentConversation.id,
+                personalityId: data.personalityId || 'default',
+                profileId: data.profileId || profileId,
+              });
+            } catch (docError) {
+              console.error(`[messageListener] Error processing document ${doc.id}:`, docError);
+            }
           });
-
-          return combinedMessages;
+          
+          if (newMessages.length > 0) {
+            console.log(`[messageListener] Received ${newMessages.length} new/updated messages`);
+            setMessages(prevMessages => {
+              // Create a map of existing messages by ID for quick lookup
+              const existingMessages = new Map(prevMessages.map(msg => [msg.id, msg]));
+              
+              // Update or add new messages
+              newMessages.forEach(newMsg => {
+                existingMessages.set(newMsg.id, newMsg);
+              });
+              
+              // Convert back to array and sort by timestamp
+              const updatedMessages = Array.from(existingMessages.values()).sort((a, b) => {
+                const tsA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+                const tsB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+                return tsA - tsB;
+              });
+              
+              return updatedMessages;
+            });
+          }
+        }, (error) => {
+          console.error('[messageListener] Error in message listener:', error);
         });
+        
       } catch (error) {
         console.error('[fetchMessages] Error:', error);
+        if (isMounted) {
+          setMessages(prev => (prev.length > 0 ? prev : []));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingMessages(false);
+        }
+      }
+      
+      return unsubscribe;
+    };
+    
+    setupMessageListener();
+    
+    // Cleanup function to prevent state updates after unmount and unsubscribe
+    return () => {
+      isMounted = false;
+      if (unsubscribe) {
+        console.log('[fetchMessages] Cleaning up message listener');
+        unsubscribe();
       }
     };
-
-    fetchMessages();
-  }, [currentConversation?.id]);
+  }, [currentConversation?.id, profileId]);
 
   // Load conversations when profile changes
   useEffect(() => {
@@ -1001,15 +1097,20 @@ const ChatScreen = () => {
         {console.log('Rendering messages:', messages.map(m => ({ id: m.id, sender: m.sender, ts: m.timestamp, text: m.text })))}
         <FlatList
         ref={flatListRef}
-        data={messages}
+        data={isTyping ? [...messages, { id: 'typing-indicator', text: '', sender: 'bot' as const, personalityId: selectedPersonality.id || 'default', userId: 'ai', timestamp: new Date(), conversationId: currentConversation?.id || '', profileId: profileId || '' }] : messages}
         keyExtractor={(item: ChatMessage) => item.id}
-        renderItem={({ item }: { item: ChatMessage }) => (
-          <MessageBubble
-            text={item.text}
-            sender={item.sender}
-            personalityEmoji={item.sender === 'bot' && PERSONALITIES[item.personalityId]?.emoji ? PERSONALITIES[item.personalityId].emoji : undefined}
-          />
-        )}
+        renderItem={({ item }: { item: ChatMessage }) => {
+          if (item.id === 'typing-indicator') {
+            return <TypingBubble />;
+          }
+          return (
+            <MessageBubble
+              text={item.text}
+              sender={item.sender}
+              personalityEmoji={item.sender === 'bot' && PERSONALITIES[item.personalityId || 'default']?.emoji ? PERSONALITIES[item.personalityId || 'default'].emoji : undefined}
+            />
+          );
+        }}
         style={styles.messageList}
         contentContainerStyle={{ paddingBottom: 10, paddingTop: 10 }}
         ListEmptyComponent={() => (
@@ -1020,7 +1121,6 @@ const ChatScreen = () => {
             )
         )}
       />
-      {isTyping && <Text style={{color: colors.text, textAlign: 'center', padding: 5, fontStyle: 'italic'}}>AI is typing...</Text>}
       <View style={styles.inputContainer}>
         <TouchableOpacity
           style={styles.personalityButton}
