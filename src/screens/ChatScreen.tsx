@@ -1112,10 +1112,9 @@ return (
          keyExtractor={(item: ChatMessage) => item.id}
          renderItem={({ item }: { item: ChatMessage }) => {
            if (item.id === 'typing-indicator') {
-             // Show emoji if selected personality has one
-             const emoji = PERSONALITIES[selectedPersonality.id]?.emoji;
-             return <TypingBubble personalityEmoji={emoji} />;
-           }
+              // Show animated three-dot bubble as bot reply placeholder
+              return <TypingBubble />;
+            }
            return (
              <MessageBubble
                text={item.text}
