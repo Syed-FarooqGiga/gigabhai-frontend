@@ -201,14 +201,17 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
 
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ position: 'relative' }}>
               <TextInput
-                style={[styles.input, {
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  borderColor: colors.inputBorder,
-                  flex: 1
-                }]}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderColor: colors.inputBorder,
+                    paddingRight: 44, // space for the icon
+                  },
+                ]}
                 placeholder="Enter your password"
                 placeholderTextColor={colors.timestamp}
                 value={password}
@@ -220,13 +223,13 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
                 onPress={() => setShowPassword(!showPassword)}
                 accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                 style={{
-                  marginLeft: 8,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: colors.inputBorder,
-                  alignItems: 'center',
+                  position: 'absolute',
+                  right: 6,
+                  top: 0,
+                  height: '100%',
                   justifyContent: 'center',
+                  alignItems: 'center',
+                  width: 36,
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 activeOpacity={0.7}
