@@ -72,6 +72,10 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
 
       if (mode === 'login') {
         await signInWithEmail(email, password);
+        // Wait for auth state to update globally before calling onSuccess
+        setTimeout(() => {
+          onSuccess();
+        }, 100); // Give a short delay for context to update
       } else {
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
@@ -85,7 +89,10 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
         return; // Let auth listener handle redirect
       }
 
-      onSuccess();
+      // onSuccess() is now called after a short delay post-login above
+      if (mode !== 'login') {
+        onSuccess();
+      }
     } catch (err: any) {
       let errorMessage = 'Authentication failed. Please try again.';
       if (err.code) {
