@@ -1,3 +1,8 @@
+// Force canonical domain (www.gigabhai.com) on web
+if (typeof window !== 'undefined' && window.location.hostname === 'gigabhai.com') {
+  window.location.href = window.location.href.replace('//gigabhai.com', '//www.gigabhai.com');
+}
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { 
