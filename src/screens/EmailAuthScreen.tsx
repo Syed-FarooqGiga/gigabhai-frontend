@@ -18,11 +18,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 type AuthMode = 'login' | 'signup';
 
-type EmailAuthScreenProps = {
-  onSuccess: () => void;
-};
+// onSuccess prop removed, navigation handled by parent
 
-const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
+
+const EmailAuthScreen = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,10 +71,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
 
       if (mode === 'login') {
         await signInWithEmail(email, password);
-        // Wait for auth state to update globally before calling onSuccess
-        setTimeout(() => {
-          onSuccess();
-        }, 300); // Give a bit more delay for context to update
+        // Navigation will be handled by parent on auth state change
       } else { // signup mode
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
@@ -84,11 +80,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
           throw new Error('Name and username are required');
         }
         await signUpWithEmail(email, password, name, username);
-        // Firebase automatically signs in the user after successful signUpWithEmail.
-        // Call onSuccess to navigate.
-        setTimeout(() => {
-          onSuccess();
-        }, 300);
+        // Navigation will be handled by parent on auth state change
       }
     } catch (err: any) {
       let errorMessage = 'Authentication failed. Please try again.';
