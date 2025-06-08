@@ -1,72 +1,85 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { useTheme } from '../contexts/ThemeContext';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/types';
-import { useAuth } from '../contexts/FirebaseAuthContext';
-import EmailAuthScreen from './EmailAuthScreen';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { useTheme } from '@react-navigation/native';
 
-declare global {
-  interface Window {
-    __alreadyReloadedAfterLogin?: boolean;
-  }
-}
+type TypingBubbleProps = { personalityEmoji?: string };
 
-type AuthScreenProps = {
-  navigation: StackNavigationProp<RootStackParamList, 'Auth'>;
-};
+export const TypingBubble: React.FC<TypingBubbleProps> = ({ personalityEmoji }) => {
+  const { colors } = useTheme();
+  const [dotCount, setDotCount] = useState(1);
+  const dotScales = [useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current];
 
-const AuthScreen = ({ navigation }: AuthScreenProps) => {
-  const { isDark } = useTheme();
-  const { user, loading } = useAuth();
-
-  // Handle navigation after successful authentication
   useEffect(() => {
-    if (user) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main' }],
-      });
-      // Reload the page once after login
-      if (typeof window !== 'undefined' && !window.__alreadyReloadedAfterLogin) {
-        window.__alreadyReloadedAfterLogin = true;
-        setTimeout(() => {
-          window.location.reload();
-        }, 200); // Delay to allow navigation to finish
-      }
-    }
-  }, [user, navigation]);
+    const interval = setInterval(() => {
+      setDotCount((prev) => (prev % 3) + 1);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
-  // No need for handleAuthSuccess fallback; rely on auth state
-  const handleAuthSuccess = () => {
-    // No-op: Navigation will be handled by the useEffect above
-  };
-
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: isDark ? '#000' : '#fff' }]}>
-        <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    // Bouncing animation for dots
+    dotScales.forEach((scale, idx) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(idx * 100),
+          Animated.timing(scale, {
+            toValue: 1.5,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.delay(300 - idx * 100),
+        ])
+      ).start();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
-      <EmailAuthScreen onSuccess={handleAuthSuccess} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '80%', marginVertical: 4, marginHorizontal: 8 }}>
+      {personalityEmoji && <Text style={styles.emoji}>{personalityEmoji}</Text>}
+      <View style={[styles.container, styles.botContainer, { backgroundColor: colors.primary, marginLeft: personalityEmoji ? 4 : 0 }]}>  
+        <Text style={[styles.text, { color: '#fff' }]}>AI is typing{' '}
+          {[0, 1, 2].map(i => (
+            <Animated.Text
+              key={i}
+              style={{
+                transform: [{ scale: dotScales[i] }],
+                color: '#fff',
+                fontSize: 18,
+                marginHorizontal: 1,
+              }}>
+              .
+            </Animated.Text>
+          ))}
+        </Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+    marginVertical: 4,
+    marginHorizontal: 8,
+    alignSelf: 'flex-start',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  botContainer: {
+    alignSelf: 'flex-start',
+  },
+  text: {
+    fontSize: 16,
+  },
+  emoji: {
+    fontSize: 24,
+    marginRight: 4,
+    alignSelf: 'center',
   },
 });
-
-export default AuthScreen;
