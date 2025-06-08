@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -236,6 +237,8 @@ const styles = StyleSheet.create<SettingsStylesType>({
 });
 
 export const SettingsScreen: React.FC = () => {
+  const scrollViewRef = useRef<any>(null);
+
   const { theme, toggleTheme, isDark } = useTheme();
   const { signOut, user, userProfile } = useAuth();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -244,6 +247,16 @@ export const SettingsScreen: React.FC = () => {
   const [saveChats, setSaveChats] = useState(true);
   const [showTerms, setShowTerms] = useState(false);
 const [showAbout, setShowAbout] = useState(false);
+
+  useEffect(() => {
+    Keyboard.dismiss();
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, [showTerms, showAbout]);
+
+  useEffect(() => {
+    Keyboard.dismiss();
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, [showTerms, showAbout]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
