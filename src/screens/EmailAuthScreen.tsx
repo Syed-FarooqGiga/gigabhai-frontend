@@ -24,6 +24,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
@@ -73,17 +74,19 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
         }
         await signUpWithEmail(email, password, name, username);
         console.log('Sign up successful');
+        // Do NOT call onSuccess here; let the auth state listener handle navigation after user is set
+        return;
       }
-      
-      // onSuccess will be called by the auth state change listener
-      // when the user state is updated
+      // Only call onSuccess after login
       console.log('Calling onSuccess callback');
       onSuccess();
     } catch (err: any) {
       console.error('Authentication error:', err);
-      const errorMessage = err.message || 'Authentication failed. Please try again.';
+      let errorMessage = err.message || 'Authentication failed. Please try again.';
+      if (err.code) {
+        errorMessage += ` (Code: ${err.code})`;
+      }
       setError(errorMessage);
-      
       // Log additional error details for debugging
       if (err.code) {
         console.error('Error code:', err.code);
@@ -148,7 +151,6 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
             />
           </View>
 
-
           {mode === 'signup' && (
             <>
               <View style={styles.inputContainer}>
@@ -181,15 +183,22 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
 
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.inputBorder }]}
-              placeholder="Enter your password"
-              placeholderTextColor={colors.timestamp}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!loading}
-            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.inputBorder, flex: 1 }]}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.timestamp}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Text style={{ fontSize: 16, color: colors.text, paddingHorizontal: 8 }}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {mode === 'signup' && (
