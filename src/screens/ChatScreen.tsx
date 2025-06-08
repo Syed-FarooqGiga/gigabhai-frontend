@@ -1082,11 +1082,12 @@ const ChatScreen = () => {
         </View>
     );
   }
+  // Use KeyboardAvoidingView only on iOS, regular View elsewhere
+  const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
   return (
-    <KeyboardAvoidingView
+    <Container
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      {...(Platform.OS === 'ios' ? { behavior: 'padding', keyboardVerticalOffset: 64 } : {})}
     >
       <Header onPressConversations={() => setShowHistoryModal(true)} />
       {!isOnline && (
@@ -1112,7 +1113,7 @@ const ChatScreen = () => {
           );
         }}
         style={styles.messageList}
-        contentContainerStyle={{ paddingBottom: 10, paddingTop: 10 }}
+        contentContainerStyle={{ paddingBottom: 0, paddingTop: 0 }}
         ListEmptyComponent={() => (
             !isLoadingMessages && (
                 <Text style={styles.emptyText}>
@@ -1252,7 +1253,7 @@ const ChatScreen = () => {
             <ActivityIndicator size="large" color={colors.primary} />
         </View>
       }
-    </KeyboardAvoidingView>
+    </Container>
   );
 };
 
