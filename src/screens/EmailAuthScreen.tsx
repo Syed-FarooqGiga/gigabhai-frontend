@@ -14,6 +14,7 @@ import {
 
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/FirebaseAuthContext';
+import { Ionicons } from '@expo/vector-icons';
 
 type AuthMode = 'login' | 'signup';
 
@@ -215,10 +216,13 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Text style={{ fontSize: 16, color: colors.text, paddingHorizontal: 8 }}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </Text>
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={22}
+                  color={colors.text}
+                  style={{ paddingHorizontal: 8 }}
+                />
               </TouchableOpacity>
             </View>
           </View>
