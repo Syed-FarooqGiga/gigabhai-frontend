@@ -1,85 +1,88 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { useTheme } from '@react-navigation/native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/types';
+import { useAuth } from '../contexts/FirebaseAuthContext';
+import EmailAuthScreen from './EmailAuthScreen';
 
-type TypingBubbleProps = { personalityEmoji?: string };
+declare global {
+  interface Window {
+    __alreadyReloadedAfterLogin?: boolean;
+    __reloadCountAfterLogin?: number;
+  }
+}
 
-export const TypingBubble: React.FC<TypingBubbleProps> = ({ personalityEmoji }) => {
-  const { colors } = useTheme();
-  const [dotCount, setDotCount] = useState(1);
-  const dotScales = [useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current];
+type AuthScreenProps = {
+  navigation: StackNavigationProp<RootStackParamList, 'Auth'>;
+};
 
+const AuthScreen = ({ navigation }: AuthScreenProps) => {
+  const { isDark } = useTheme();
+  const { user, loading } = useAuth();
+
+  // Handle navigation after successful authentication
   useEffect(() => {
-    const interval = setInterval(() => {
-      setDotCount((prev) => (prev % 3) + 1);
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
+    if (user) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+      // Force reload on any iOS or Android mobile browser (Safari, Chrome, Firefox, Edge)
+      if (
+        typeof window !== 'undefined' &&
+        (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) &&
+        (/Safari|CriOS|FxiOS|EdgiOS|Chrome|Firefox|SamsungBrowser|UCBrowser|OPR\//i.test(navigator.userAgent))
+      ) {
+        // Prevent reload loop: only reload ONCE per page load
+        // Reload up to two times after login
+        if (typeof window !== 'undefined') {
+          if (!window.__reloadCountAfterLogin) window.__reloadCountAfterLogin = 0;
+          if (window.__reloadCountAfterLogin < 2) {
+            window.__reloadCountAfterLogin++;
+            setTimeout(() => {
+              try {
+                window.location.reload();
+              } catch (e) {
+                // Fallback: do nothing
+              }
+            }, 400);
+          }
+        }
+      }
+    }
+  }, [user, navigation]);
 
-  useEffect(() => {
-    // Bouncing animation for dots
-    dotScales.forEach((scale, idx) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(idx * 100),
-          Animated.timing(scale, {
-            toValue: 1.5,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scale, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.delay(300 - idx * 100),
-        ])
-      ).start();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No need for handleAuthSuccess fallback; rely on auth state
+  const handleAuthSuccess = () => {
+    // No-op: Navigation will be handled by the useEffect above
+  };
+
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: isDark ? '#000' : '#fff' }]}>
+        <ActivityIndicator size="large" color={isDark ? '#fff' : '#000'} />
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '80%', marginVertical: 4, marginHorizontal: 8 }}>
-      {personalityEmoji && <Text style={styles.emoji}>{personalityEmoji}</Text>}
-      <View style={[styles.container, styles.botContainer, { backgroundColor: colors.primary, marginLeft: personalityEmoji ? 4 : 0 }]}>  
-        <Text style={[styles.text, { color: '#fff' }]}>AI is typing{' '}
-          {[0, 1, 2].map(i => (
-            <Animated.Text
-              key={i}
-              style={{
-                transform: [{ scale: dotScales[i] }],
-                color: '#fff',
-                fontSize: 18,
-                marginHorizontal: 1,
-              }}>
-              .
-            </Animated.Text>
-          ))}
-        </Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
+      <EmailAuthScreen onSuccess={handleAuthSuccess} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
-    marginVertical: 4,
-    marginHorizontal: 8,
-    alignSelf: 'flex-start',
+    flex: 1,
   },
-  botContainer: {
-    alignSelf: 'flex-start',
-  },
-  text: {
-    fontSize: 16,
-  },
-  emoji: {
-    fontSize: 24,
-    marginRight: 4,
-    alignSelf: 'center',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
+
+export default AuthScreen;
