@@ -14,13 +14,22 @@ export async function uploadFeedback(
   if (!feedback.trim()) throw new Error('Feedback is empty');
   const db = getFirebaseFirestore();
   const feedbackRef = collection(db, 'users', userInfo.profileId, 'feedback');
-  const docRef = await addDoc(feedbackRef, {
-    feedback,
-    email: userInfo.email || '',
-    name: userInfo.name || '',
-    username: userInfo.username || '',
-    profileId: userInfo.profileId || '',
-    submittedAt: serverTimestamp(),
-  });
-  return docRef;
+  console.log('[uploadFeedback] Attempting to write to:', `users/${userInfo.profileId}/feedback`);
+  console.log('[uploadFeedback] Data:', { feedback, ...userInfo });
+  try {
+    const docRef = await addDoc(feedbackRef, {
+      feedback,
+      email: userInfo.email || '',
+      name: userInfo.name || '',
+      username: userInfo.username || '',
+      profileId: userInfo.profileId || '',
+      submittedAt: serverTimestamp(),
+    });
+    console.log('[uploadFeedback] Success! DocRef:', docRef.path);
+    return docRef;
+  } catch (err) {
+    console.error('[uploadFeedback] Firestore error:', err);
+    throw err;
+  }
 }
+
