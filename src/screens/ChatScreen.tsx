@@ -1082,19 +1082,23 @@ const ChatScreen = () => {
         </View>
     );
   }
-  // Use KeyboardAvoidingView only on iOS, regular View elsewhere
-  const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-   // Fixes for mobile Chrome blank space and scroll issues:
-   // - Make container and FlatList flex: 1 (fill screen)
-   // - FlatList contentContainerStyle uses flexGrow: 1 and justifyContent: 'flex-end'
-   // - Remove extra padding/margin at bottom
-   // - Header always visible at top
-   // - KeyboardAvoidingView only on iOS
-   return (
-     <Container
-       style={[styles.container, { flex: 1 }]}
-       {...(Platform.OS === 'ios' ? { behavior: 'padding', keyboardVerticalOffset: 64 } : {})}
-     >
+  // Use KeyboardAvoidingView on iOS and Android (not web) to handle keyboard pop-up without blank space.
+// On web, use regular View to avoid layout bugs. On Android, use behavior='height' for best results.
+const isWeb = Platform.OS === 'web';
+const Container = !isWeb ? KeyboardAvoidingView : View;
+// Fixes for mobile Chrome/Android blank space and scroll issues:
+// - Make container and FlatList flex: 1 (fill screen)
+// - FlatList contentContainerStyle uses flexGrow: 1 and justifyContent: 'flex-end'
+// - Remove extra padding/margin at bottom
+// - Header always visible at top
+// - KeyboardAvoidingView on iOS/Android, View on web
+return (
+  <Container
+    style={[styles.container, { flex: 1 }]}
+    {...(!isWeb ? (Platform.OS === 'ios'
+      ? { behavior: 'padding', keyboardVerticalOffset: 64 }
+      : { behavior: 'height' }) : {})}
+  >
        <Header onPressConversations={() => setShowHistoryModal(true)} />
        {!isOnline && (
          <View style={styles.networkStatusBar}>
