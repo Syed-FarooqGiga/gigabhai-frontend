@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/FirebaseAuthContext'; // Make sure this is the correct AuthContext
+import { uploadFeedback } from '../services/feedback';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/types';
 import { PERSONALITIES } from '../constants';
@@ -236,7 +237,7 @@ const styles = StyleSheet.create<SettingsStylesType>({
 
 export const SettingsScreen: React.FC = () => {
   const { theme, toggleTheme, isDark } = useTheme();
-  const { signOut, user } = useAuth();
+  const { signOut, user, userProfile } = useAuth();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [feedback, setFeedback] = useState('');
   const [defaultPersonality, setDefaultPersonality] = useState<string>('swag');
@@ -302,15 +303,30 @@ const [showAbout, setShowAbout] = useState(false);
       Alert.alert('Empty Feedback', 'Please enter your feedback before submitting.');
       return;
     }
-
+    if (!user) {
+      Alert.alert('Not logged in', 'You must be logged in to submit feedback.');
+      return;
+    }
     setIsLoading(true);
     try {
-      // Here you would typically send the feedback to your backend
-      // For now, we'll just simulate a delay
-      await new Promise<void>((resolve) => {
-        setTimeout(() => resolve(), 1000);
-      });
-      
+      // Gather user info for feedback
+      const email = user.email || '';
+      const name = user.displayName || '';
+      // Try to get username and profileId from userProfile if available
+      // Try to get username and profileId from userProfile if available
+      let username = '';
+      let profileId = '';
+      if (userProfile && userProfile.username) {
+        username = userProfile.username;
+      }
+      if (userProfile && userProfile.id) {
+        profileId = userProfile.id;
+      } else if (user.providerData && user.providerData.length > 0) {
+        profileId = `${user.uid}_${user.providerData[0].providerId}`;
+      } else {
+        profileId = user.uid;
+      }
+      await uploadFeedback(feedback, { email, name, username, profileId });
       setFeedback('');
       Toast.show({
         type: 'success',
@@ -323,6 +339,7 @@ const [showAbout, setShowAbout] = useState(false);
       Toast.show({
         type: 'error',
         text1: 'Failed to submit feedback',
+        text2: (error as Error).message,
         position: 'bottom',
       });
     } finally {
