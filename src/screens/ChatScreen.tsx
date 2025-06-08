@@ -1102,7 +1102,9 @@ const ChatScreen = () => {
         keyExtractor={(item: ChatMessage) => item.id}
         renderItem={({ item }: { item: ChatMessage }) => {
           if (item.id === 'typing-indicator') {
-            return <TypingBubble />;
+            // Show emoji if selected personality has one
+            const emoji = PERSONALITIES[selectedPersonality.id]?.emoji;
+            return <TypingBubble personalityEmoji={emoji} />;
           }
           return (
             <MessageBubble
@@ -1444,4 +1446,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
-
