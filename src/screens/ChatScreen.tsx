@@ -1084,47 +1084,54 @@ const ChatScreen = () => {
   }
   // Use KeyboardAvoidingView only on iOS, regular View elsewhere
   const Container = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-  return (
-    <Container
-      style={styles.container}
-      {...(Platform.OS === 'ios' ? { behavior: 'padding', keyboardVerticalOffset: 64 } : {})}
-    >
-      <Header onPressConversations={() => setShowHistoryModal(true)} />
-      {!isOnline && (
-        <View style={styles.networkStatusBar}>
-          <Text style={styles.networkStatusText}>You are offline. Some features may be limited.</Text>
-        </View>
-      )}
-        {console.log('Rendering messages:', messages.map(m => ({ id: m.id, sender: m.sender, ts: m.timestamp, text: m.text })))}
-        <FlatList
-        ref={flatListRef}
-        data={isTyping ? [...messages, { id: 'typing-indicator', text: '', sender: 'bot' as const, personalityId: selectedPersonality.id || 'default', userId: 'ai', timestamp: new Date(), conversationId: currentConversation?.id || '', profileId: profileId || '' }] : messages}
-        keyExtractor={(item: ChatMessage) => item.id}
-        renderItem={({ item }: { item: ChatMessage }) => {
-          if (item.id === 'typing-indicator') {
-            // Show emoji if selected personality has one
-            const emoji = PERSONALITIES[selectedPersonality.id]?.emoji;
-            return <TypingBubble personalityEmoji={emoji} />;
-          }
-          return (
-            <MessageBubble
-              text={item.text}
-              sender={item.sender}
-              personalityEmoji={item.sender === 'bot' && PERSONALITIES[item.personalityId || 'default']?.emoji ? PERSONALITIES[item.personalityId || 'default'].emoji : undefined}
-            />
-          );
-        }}
-        style={styles.messageList}
-        contentContainerStyle={{ paddingBottom: 0, paddingTop: 0 }}
-        ListEmptyComponent={() => (
-            !isLoadingMessages && (
-                <Text style={styles.emptyText}>
-                    {currentConversation ? 'No messages yet. Start typing!' : 'Select or start a new conversation.'}
-                </Text>
-            )
-        )}
-      />
-      <View style={styles.inputContainer}>
+   // Fixes for mobile Chrome blank space and scroll issues:
+   // - Make container and FlatList flex: 1 (fill screen)
+   // - FlatList contentContainerStyle uses flexGrow: 1 and justifyContent: 'flex-end'
+   // - Remove extra padding/margin at bottom
+   // - Header always visible at top
+   // - KeyboardAvoidingView only on iOS
+   return (
+     <Container
+       style={[styles.container, { flex: 1 }]}
+       {...(Platform.OS === 'ios' ? { behavior: 'padding', keyboardVerticalOffset: 64 } : {})}
+     >
+       <Header onPressConversations={() => setShowHistoryModal(true)} />
+       {!isOnline && (
+         <View style={styles.networkStatusBar}>
+           <Text style={styles.networkStatusText}>You are offline. Some features may be limited.</Text>
+         </View>
+       )}
+         {console.log('Rendering messages:', messages.map(m => ({ id: m.id, sender: m.sender, ts: m.timestamp, text: m.text })))}
+         <FlatList
+         ref={flatListRef}
+         data={isTyping ? [...messages, { id: 'typing-indicator', text: '', sender: 'bot' as const, personalityId: selectedPersonality.id || 'default', userId: 'ai', timestamp: new Date(), conversationId: currentConversation?.id || '', profileId: profileId || '' }] : messages}
+         keyExtractor={(item: ChatMessage) => item.id}
+         renderItem={({ item }: { item: ChatMessage }) => {
+           if (item.id === 'typing-indicator') {
+             // Show emoji if selected personality has one
+             const emoji = PERSONALITIES[selectedPersonality.id]?.emoji;
+             return <TypingBubble personalityEmoji={emoji} />;
+           }
+           return (
+             <MessageBubble
+               text={item.text}
+               sender={item.sender}
+               personalityEmoji={item.sender === 'bot' && PERSONALITIES[item.personalityId || 'default']?.emoji ? PERSONALITIES[item.personalityId || 'default'].emoji : undefined}
+             />
+           );
+         }}
+         style={[styles.messageList, { flex: 1 }]}
+         // Fix: Ensure content grows to fill and pushes input to bottom, prevents blank space below input
+         contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 0, paddingTop: 0 }}
+         ListEmptyComponent={() => (
+             !isLoadingMessages && (
+                 <Text style={styles.emptyText}>
+                     {currentConversation ? 'No messages yet. Start typing!' : 'Select or start a new conversation.'}
+                 </Text>
+             )
+         )}
+       />
+       <View style={[styles.inputContainer, { marginBottom: 0 }]}>
         <TouchableOpacity
           style={styles.personalityButton}
           onPress={() => setShowPersonalityModal(true)}
