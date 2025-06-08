@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "source": "https://gigabhai.com/:path*", "destination": "https://www.gigabhai.com/:path*", "permanent": true }
+  ]
+}
