@@ -16,7 +16,7 @@ type FirebaseConfig = {
 // Firebase configuration values
 const firebaseConfig: FirebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBmzIi63vflLOYA1NQ_tY1FIiuE_Xz6iIA",
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "giga-bhai18.firebaseapp.com",
+  authDomain: (process.env.NODE_ENV === 'production') ? 'www.gigabhai.com' : (process.env.FIREBASE_AUTH_DOMAIN || 'giga-bhai18.firebaseapp.com'),
   projectId: process.env.FIREBASE_PROJECT_ID || "giga-bhai18",
   storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "giga-bhai18.appspot.com",
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "283750414629",
