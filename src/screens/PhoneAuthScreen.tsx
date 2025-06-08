@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   StyleSheet,
   SafeAreaView,
   Keyboard,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,10 +25,22 @@ type PhoneAuthScreenProps = {
 };
 
 const PhoneAuthScreen: React.FC<PhoneAuthScreenProps> = ({ onSuccess }) => {
+  const scrollViewRef = useRef<any>(null);
+
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<'phone' | 'code'>('phone');
+
+  useEffect(() => {
+    Keyboard.dismiss();
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, [step]);
+
+  useEffect(() => {
+    Keyboard.dismiss();
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, [step]);
   const [confirmation, setConfirmation] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
   
   const { isDark } = useTheme();
