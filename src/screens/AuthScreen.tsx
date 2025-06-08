@@ -86,7 +86,7 @@ const AuthScreen = ({ navigation }: AuthScreenProps) => {
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#fff' }]}>
-      <EmailAuthScreen onSuccess={handleAuthSuccess} />
+      <EmailAuthScreen />
     </View>
   );
 };
