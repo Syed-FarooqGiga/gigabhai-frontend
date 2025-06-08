@@ -211,6 +211,13 @@ const sendMessageToBackendAndGetResponse = async (
     if (!currentUser) throw new Error('User not authenticated');
     const idToken = await currentUser.getIdToken();
 
+    const userProfileId = profileId; // Use the profileId from useAuth hook
+
+    if (!userProfileId) {
+      console.log('[sendMessageToBackendAndGetResponse] Missing profileId');
+      return null;
+    }
+
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: {
@@ -297,15 +304,63 @@ const Header: React.FC<HeaderProps> = ({ onPressConversations }) => {
 
 // Main ChatScreen component
 const ChatScreen = () => {
+  // --- Hooks Declarations (MUST be at the top) ---
   const { colors, isDark } = useTheme();
+  // Destructure session and loading state from useAuth hook (as defined in hooks/useAuth.ts)
+  const { session, loading: authLoading /*, signIn, signOut, etc. */ } = useAuth();
+  const navigation = useNavigation<ChatScreenNavigationProp>();
+
+  // Extract user and profileId from the session object
+  const { user, profileId } = session;
+
+  // --- State Variables --- 
+  // Consolidated state declarations to prevent redeclarations
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false); // For AI typing indicator
+  const [isTyping, setIsTyping] = useState(false);
   const [selectedPersonality, setSelectedPersonality] = useState<PersonalityType>(PERSONALITIES[DEFAULT_PERSONALITY_ID]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [isOnline, setIsOnline] = useState(true);
-  const [profileId, setProfileId] = useState<string | null>(null);
-// (All other duplicate declarations of these variables throughout this function have been removed)
+  const [showPersonalityModal, setShowPersonalityModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [showPersonalityHint, setShowPersonalityHint] = useState(false); // For the personality hint feature
+
+  // --- Refs --- 
+  // Consolidated ref declarations
+  const flatListRef = useRef<InstanceType<typeof FlatList<ChatMessage>> | null>(null);
+  const inputRef = useRef<InstanceType<typeof TextInput> | null>(null);
+  const isMountedRef = useRef(true);
+  const lastMessageIdRef = useRef<string | null>(null);
+  const personalityHintDismissed = useRef(false); // For the personality hint feature
+
+
+  // --- Early Return Guard --- 
+  // If auth is loading, show a loading screen. Uses inline styles to avoid 'styles before declaration' errors.
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, marginTop: 10 }}>Loading authentication...</Text>
+      </View>
+    );
+  }
+
+  // If profileId is not available after auth has loaded, show a message.
+  // This prevents React Hook errors and rendering issues.
+  if (!profileId) {
+    console.log('[ChatScreen] No profileId available. User might not be fully authenticated or profileId is missing.');
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, marginTop: 10 }}>Waiting for user profile...</Text>
+      </View>
+    );
+  }
+
+  // All state and ref declarations are now consolidated above this early return guard.
 
   // Load messages when the conversation changes and set up real-time listener
   useEffect(() => {
@@ -426,12 +481,11 @@ const ChatScreen = () => {
   }, [profileId]);
 
   const [userId, setUserId] = useState<string | null>(null);
-  const [showPersonalityModal, setShowPersonalityModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const { session, loading: authLoading } = useAuth();
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'Chat'>>();
-  const flatListRef = useRef<any>(null);
+  
+  
+  
+  
+
   // Drawer state
   const [drawerVisible, setDrawerVisible] = useState(false);
   const drawerAnim = useRef(new Animated.Value(-280)).current;
@@ -462,7 +516,7 @@ const ChatScreen = () => {
   }, []);
 
   // State to hold all conversations
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  
 
   // Derive profileId and userId from session
   useEffect(() => {
@@ -502,27 +556,26 @@ const ChatScreen = () => {
         setCurrentConversation(null);
       }
     };
-    if (session?.user && session.profileId) {
-      setProfileId(session.profileId);
-      setUserId(session.user.uid);
-      console.log('Profile ID set:', session.profileId, 'User ID set:', session.user.uid);
-      restoreLastConversation(session.profileId);
+    // Effect to handle session changes, load initial data
+    if (session?.profileId && session?.user) {
+      console.log('[ChatScreen] Profile ID available:', session.profileId, 'User ID available:', session.user.uid);
+      restoreLastConversation(session.profileId); // Use session.profileId directly
       // Debug: Print all messages for this profileId
-      const debugPrintAllMessages = async (profileId: string) => {
+      const debugPrintAllMessages = async (pid: string) => {
         try {
           const db = getFirestore();
-          const messagesSnapshot = await getDocs(collection(db, 'users', profileId, 'messages'));
+          // Note: Path 'users/{profileId}/messages' might be missing a conversation segment depending on your Firestore structure.
+          const messagesSnapshot = await getDocs(collection(db, 'users', pid, 'messages'));
           const allMessages = messagesSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-          console.log('[ChatScreen][DEBUG] All messages for profile', profileId, allMessages);
+          console.log('[ChatScreen][DEBUG] All messages for profile', pid, allMessages);
         } catch (err) {
-          console.error('[ChatScreen][DEBUG] Error fetching all messages for profile:', profileId, err);
+          console.error('[ChatScreen][DEBUG] Error fetching all messages for profile:', pid, err);
         }
       };
-      debugPrintAllMessages(session.profileId);
-    } else if (!authLoading && !session) {
-      setProfileId(null);
-      setUserId(null);
+      debugPrintAllMessages(session.profileId); // Use session.profileId directly
+    } else if (!authLoading && !session?.user) { // If not loading and no user in session
       setCurrentConversation(null);
+      // Any other cleanup if user signs out can be added here
     }
   }, [session, authLoading]);
 
@@ -1054,16 +1107,16 @@ const isWeb = Platform.OS === 'web';
 const Container = !isWeb ? KeyboardAvoidingView : View;
 const keyboardVerticalOffset = Platform.OS === 'ios' ? 64 : Platform.OS === 'android' ? 0 : 0;
 
-  const [showPersonalityHint, setShowPersonalityHint] = useState(true);
-  const personalityHintDismissed = useRef(false);
+
 
   // Show the hint only on first login (when profileId changes and user lands on ChatScreen)
-  useEffect(() => {
-    if (profileId) { // Only show if profileId is available
-      setShowPersonalityHint(true);
-      personalityHintDismissed.current = false;
-    }
-  }, [profileId]);
+    // useEffect for personality hint (if you re-add it)
+  // useEffect(() => {
+  //   if (profileId) { // Now uses profileId from useAuth()
+  //     setShowPersonalityHint(true);
+  //     personalityHintDismissed.current = false;
+  //   }
+  // }, [profileId]);
 
   const handleDismissHint = useCallback(() => {
     if (!personalityHintDismissed.current) {
