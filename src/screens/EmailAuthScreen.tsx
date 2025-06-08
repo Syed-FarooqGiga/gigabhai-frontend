@@ -79,6 +79,8 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
         if (!name.trim() || !username.trim()) {
           throw new Error('Name and username are required');
         }
+        // After successful signup, Firebase automatically logs in the user.
+        // Do NOT attempt to log in again here. Let the auth state listener handle navigation.
         await signUpWithEmail(email, password, name, username);
         return; // Let auth listener handle redirect
       }
