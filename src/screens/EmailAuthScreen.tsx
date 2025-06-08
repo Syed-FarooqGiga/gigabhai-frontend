@@ -216,12 +216,25 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                style={{
+                  marginLeft: 8,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.inputBorder,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+              >
                 <Ionicons
                   name={showPassword ? 'eye-off' : 'eye'}
-                  size={22}
-                  color={colors.text}
-                  style={{ paddingHorizontal: 8 }}
+                  size={24}
+                  color={colors.text === '#fff' ? '#222' : '#555'}
                 />
               </TouchableOpacity>
             </View>
