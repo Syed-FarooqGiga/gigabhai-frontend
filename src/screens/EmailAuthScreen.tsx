@@ -149,6 +149,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
     >
       <ScrollView
         ref={scrollViewRef}
+        style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
@@ -170,7 +171,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
               placeholder="Enter your email"
               placeholderTextColor={colors.timestamp}
               value={email}
-              onChangeText={(text) => { setEmail(text); setError(''); }}
+              onChangeText={(text: string) => { setEmail(text); setError(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
