@@ -2,22 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 
-type TypingBubbleProps = { personalityEmoji?: string };
 
-export const TypingBubble: React.FC<TypingBubbleProps> = ({ personalityEmoji }) => {
+
+export const TypingBubble: React.FC = () => {
   const { colors } = useTheme();
-  const [dotCount, setDotCount] = useState(1);
   const dotScales = [useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current];
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setDotCount((prev) => (prev % 3) + 1);
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    // Bouncing animation for dots
     dotScales.forEach((scale, idx) => {
       Animated.loop(
         Animated.sequence([
@@ -40,23 +31,21 @@ export const TypingBubble: React.FC<TypingBubbleProps> = ({ personalityEmoji }) 
   }, []);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '80%', marginVertical: 4, marginHorizontal: 8 }}>
-      {personalityEmoji && <Text style={styles.emoji}>{personalityEmoji}</Text>}
-      <View style={[styles.container, styles.botContainer, { backgroundColor: colors.primary, marginLeft: personalityEmoji ? 4 : 0 }]}>  
-        <Text style={[styles.text, { color: '#fff' }]}>AI is typing{' '}
-          {[0, 1, 2].map(i => (
-            <Animated.Text
-              key={i}
-              style={{
-                transform: [{ scale: dotScales[i] }],
-                color: '#fff',
-                fontSize: 18,
-                marginHorizontal: 1,
-              }}>
-              .
-            </Animated.Text>
-          ))}
-        </Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '80%', marginVertical: 4, marginHorizontal: 8, justifyContent: 'flex-start' }}>
+      <View style={[styles.container, styles.botContainer, { backgroundColor: colors.primary, minWidth: 48, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }]}>  
+        {[0, 1, 2].map(i => (
+          <Animated.Text
+            key={i}
+            style={{
+              transform: [{ scale: dotScales[i] }],
+              color: '#fff',
+              fontSize: 26,
+              marginHorizontal: 2,
+              fontWeight: 'bold',
+            }}>
+            .
+          </Animated.Text>
+        ))}
       </View>
     </View>
   );
@@ -74,16 +63,6 @@ const styles = StyleSheet.create({
   botContainer: {
     alignSelf: 'flex-start',
   },
-  text: {
-    fontSize: 16,
-  },
-  emoji: {
-    fontSize: 24,
-    marginRight: 4,
-    alignSelf: 'center',
-  },
-});
-
   text: {
     fontSize: 16,
   },
