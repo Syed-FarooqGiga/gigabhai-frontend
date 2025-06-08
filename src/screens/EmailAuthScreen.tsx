@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  Keyboard,
 } from 'react-native';
+
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/FirebaseAuthContext';
 
@@ -29,15 +31,23 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [forgotMessageColor, setForgotMessageColor] = useState('#4caf50');
 
+  const scrollViewRef = useRef<any>(null); // ✅ ref to scroll view
+
   const { signInWithEmail, signUpWithEmail, sendPasswordResetEmail } = useAuth();
   const { colors } = useTheme();
+
+  useEffect(() => {
+    Keyboard.dismiss(); // Dismiss keyboard on mode change
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: true }); // ✅ Scroll to top when mode changes
+    }
+  }, [mode]);
 
   const handleForgotPassword = async () => {
     setForgotLoading(true);
@@ -46,7 +56,6 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
     try {
       await sendPasswordResetEmail(forgotEmail.trim());
       setForgotMessage('If this email exists, a reset link has been sent.');
-      setForgotMessageColor('#4caf50');
     } catch (err: any) {
       setForgotMessage('Failed to send reset link. Try again.');
       setForgotMessageColor('#f44336');
@@ -59,13 +68,10 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
     try {
       setLoading(true);
       setError('');
-      
+
       if (mode === 'login') {
-        console.log('Attempting to sign in with email:', email);
         await signInWithEmail(email, password);
-        console.log('Sign in successful');
       } else {
-        console.log('Attempting to sign up with email:', email);
         if (password !== confirmPassword) {
           throw new Error('Passwords do not match');
         }
@@ -73,29 +79,39 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
           throw new Error('Name and username are required');
         }
         await signUpWithEmail(email, password, name, username);
-        console.log('Sign up successful');
-        // Do NOT call onSuccess here; let the auth state listener handle navigation after user is set
-        return;
+        return; // Let auth listener handle redirect
       }
-      // Only call onSuccess after login
-      console.log('Calling onSuccess callback');
+
       onSuccess();
     } catch (err: any) {
-      console.error('Authentication error:', err);
-      let errorMessage = err.message || 'Authentication failed. Please try again.';
+      let errorMessage = 'Authentication failed. Please try again.';
       if (err.code) {
-        errorMessage += ` (Code: ${err.code})`;
+        switch (err.code) {
+          case 'auth/user-not-found':
+            errorMessage = 'No account found with this email.';
+            break;
+          case 'auth/wrong-password':
+            errorMessage = 'Incorrect password. Please try again.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address.';
+            break;
+          case 'auth/email-already-in-use':
+            errorMessage = 'This email is already in use.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password should be at least 6 characters.';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Please wait and try again.';
+            break;
+          default:
+            errorMessage = err.message || errorMessage;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       setError(errorMessage);
-      // Log additional error details for debugging
-      if (err.code) {
-        console.error('Error code:', err.code);
-        console.error('Error details:', {
-          email,
-          hasPassword: !!password,
-          error: JSON.stringify(err, Object.getOwnPropertyNames(err))
-        });
-      }
     } finally {
       setLoading(false);
     }
@@ -116,12 +132,13 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      <ScrollView 
+      <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
@@ -129,7 +146,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
           <Text style={[styles.title, { color: colors.text }]}>
             {mode === 'login' ? 'Welcome Back' : 'Create Account'}
           </Text>
-          
+
           {error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
@@ -143,7 +160,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
               placeholder="Enter your email"
               placeholderTextColor={colors.timestamp}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => { setEmail(text); setError(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -160,7 +177,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
                   placeholder="Enter your full name"
                   placeholderTextColor={colors.timestamp}
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(text: string) => { setName(text); setError(''); }}
                   editable={!loading}
                 />
               </View>
@@ -172,7 +189,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
                   placeholder="Choose a username"
                   placeholderTextColor={colors.timestamp}
                   value={username}
-                  onChangeText={setUsername}
+                  onChangeText={(text: string) => { setUsername(text); setError(''); }}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading}
@@ -185,11 +202,16 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
             <Text style={[styles.label, { color: colors.text }]}>Password</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <TextInput
-                style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.inputBorder, flex: 1 }]}
+                style={[styles.input, {
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderColor: colors.inputBorder,
+                  flex: 1
+                }]}
                 placeholder="Enter your password"
                 placeholderTextColor={colors.timestamp}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text: string) => { setPassword(text); setError(''); }}
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
@@ -209,7 +231,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
                 placeholder="Confirm your password"
                 placeholderTextColor={colors.timestamp}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(text: string) => { setConfirmPassword(text); setError(''); }}
                 secureTextEntry
                 editable={!loading}
               />
@@ -230,7 +252,6 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
             )}
           </TouchableOpacity>
 
-          {/* Forgot Password Button (only in login mode) */}
           {mode === 'login' && (
             <TouchableOpacity
               style={{ marginTop: 10, alignItems: 'center' }}
@@ -241,9 +262,8 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
             </TouchableOpacity>
           )}
 
-          {/* Forgot Password Modal */}
           {showForgotPassword && (
-            <View style={{ marginTop: 24, padding: 16, backgroundColor: colors.background, borderRadius: 10, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8 }}>
+            <View style={{ marginTop: 24, padding: 16, backgroundColor: colors.background, borderRadius: 10 }}>
               <Text style={{ color: colors.text, fontWeight: 'bold', marginBottom: 8 }}>Reset Password</Text>
               <Text style={{ color: colors.text, marginBottom: 8, fontSize: 13 }}>Enter your email address and we'll send you a reset link.</Text>
               <TextInput
@@ -271,11 +291,14 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
               {forgotMessage ? (
                 <Text style={{ color: forgotMessageColor, marginTop: 8, textAlign: 'center', fontSize: 13 }}>{forgotMessage}</Text>
               ) : null}
-              <TouchableOpacity style={{ marginTop: 10, alignItems: 'center' }} onPress={() => {
-                setShowForgotPassword(false);
-                setForgotMessage('');
-                setForgotEmail('');
-              }}>
+              <TouchableOpacity
+                style={{ marginTop: 10, alignItems: 'center' }}
+                onPress={() => {
+                  setShowForgotPassword(false);
+                  setForgotMessage('');
+                  setForgotEmail('');
+                }}
+              >
                 <Text style={{ color: colors.primary, fontSize: 14 }}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -287,9 +310,7 @@ const EmailAuthScreen = ({ onSuccess }: EmailAuthScreenProps) => {
             disabled={loading}
           >
             <Text style={[styles.switchModeText, { color: colors.primary }]}>
-              {mode === 'login' 
-                ? "Don't have an account? Sign Up" 
-                : 'Already have an account? Log In'}
+              {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Log In'}
             </Text>
           </TouchableOpacity>
         </View>
