@@ -35,6 +35,7 @@ import { TypingBubble } from '../components/TypingBubble';
 import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, orderBy, doc, serverTimestamp, setDoc, getDoc, onSnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 
 // Load messages from Firestore for the given conversation
+// Loads ALL messages for a conversation, including both user and bot (AI) messages, sorted by timestamp ascending. No filtering on sender.
 const loadMessagesFromFirestore = async (profileId: string, conversationId: string): Promise<ChatMessage[]> => {
   if (!profileId || !conversationId) {
     console.log('[loadMessagesFromFirestore] Missing profileId or conversationId');
@@ -48,6 +49,7 @@ const loadMessagesFromFirestore = async (profileId: string, conversationId: stri
     const messagesRef = collection(db, 'users', profileId, 'conversations', conversationId, 'messages');
     console.log(`[loadMessagesFromFirestore] Messages ref path: users/${profileId}/conversations/${conversationId}/messages`);
     
+    // Query all messages, regardless of sender (user or bot), sorted by timestamp ascending
     const q = query(
       messagesRef,
       orderBy('timestamp', 'asc')
@@ -70,7 +72,6 @@ const loadMessagesFromFirestore = async (profileId: string, conversationId: stri
           console.warn(`[loadMessagesFromFirestore] Document ${doc.id} has no data`);
           return;
         }
-        
         const message: ChatMessage = {
           id: doc.id,
           text: data.text || '',
@@ -81,7 +82,6 @@ const loadMessagesFromFirestore = async (profileId: string, conversationId: stri
           personalityId: data.personalityId || 'default',
           profileId: data.profileId || profileId,
         };
-        
         messages.push(message);
       } catch (docError) {
         console.error(`[loadMessagesFromFirestore] Error processing document ${doc.id}:`, docError);
