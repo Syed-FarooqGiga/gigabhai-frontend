@@ -414,50 +414,15 @@ const ChatScreen = () => {
     };
   }, [currentConversation?.id, profileId]);
 
-  // Load conversations when profile changes
+  // Always create a new conversation after login or profileId change
   useEffect(() => {
-    const loadConversations = async () => {
+    const createNewOnLogin = async () => {
       if (!profileId) return;
-
-      try {
-        const db = getFirestore();
-        const conversationsRef = collection(db, 'conversations');
-        const q = query(
-          conversationsRef,
-          where('profileId', '==', profileId),
-          orderBy('updatedAt', 'desc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          const conversations = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              profileId: data.profileId,
-              title: data.title || 'New Chat',
-              personalityId: data.personalityId || 'default',
-              lastMessage: data.lastMessage || '',
-              timestamp: data.updatedAt?.toDate() || new Date(),
-              createdAt: data.createdAt?.toDate() || new Date(),
-              updatedAt: data.updatedAt?.toDate() || new Date()
-            } as unknown as Conversation;
-          });
-
-          setConversations(conversations);
-          
-          // If no current conversation and we have conversations, select the first one
-          if (!currentConversation && conversations.length > 0) {
-            setCurrentConversation(conversations[0]);
-          }
-        });
-
-        return () => unsubscribe();
-      } catch (error) {
-        console.error('Error loading conversations:', error);
-      }
+      // Optionally clear old state
+      setCurrentConversation(null);
+      await createNewConversation(); // createNewConversation will setCurrentConversation internally
     };
-
-    loadConversations();
+    createNewOnLogin();
   }, [profileId]);
 
   const [userId, setUserId] = useState<string | null>(null);
