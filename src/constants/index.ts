@@ -68,4 +68,4 @@ export const PERSONALITIES: Record<string, Personality> = {
   }
 };
 
-export const API_URL = 'https://https://api.gigabhai.com';
+export const API_URL = 'https://api.gigabhai.com';
