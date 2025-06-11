@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-
 import { API_URL } from '../constants';
 import type { FC } from 'react';
 import { PERSONALITIES, DEFAULT_PERSONALITY_ID } from '../constants/personalities';
 import { useTheme } from '../contexts/ThemeContext';
+import { Image } from 'expo-image';
 import {
   Animated,
   View,
@@ -17,11 +17,11 @@ import {
   KeyboardAvoidingView,
   Modal,
   Pressable,
-  Image
 } from 'react-native';
 
 
 // Import the logo image
+// Using require for image to avoid TypeScript errors with dynamic imports
 const GigaLogo = require('../Giga-logo1.png');
 
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
@@ -32,7 +32,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { MessageBubble } from '../components/MessageBubble';
 import { TypingBubble } from '../components/TypingBubble';
-import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, orderBy, doc, serverTimestamp, setDoc, getDoc, onSnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, orderBy, doc, serverTimestamp, setDoc, getDoc, onSnapshot, DocumentData, QueryDocumentSnapshot, limit } from 'firebase/firestore';
 
 // Load messages from Firestore for the given conversation
 // Loads ALL messages for a conversation, including both user and bot (AI) messages, sorted by timestamp ascending. No filtering on sender.
@@ -368,8 +368,16 @@ const ChatScreen = () => {
     let unsubscribe = () => {};
     
     const setupMessageListener = async () => {
-      if (!profileId || !currentConversation?.id) {
-        console.log('[fetchMessages] Missing profileId or conversationId');
+      if (!profileId) {
+        console.warn('No profileId available. Cannot set up message listener.');
+        if (isMounted) {
+          setMessages([]);
+        }
+        return () => {};
+      }
+      
+      if (!currentConversation?.id) {
+        console.log('[fetchMessages] No active conversation. Will set up listener when a conversation is selected.');
         if (isMounted) {
           setMessages([]);
         }
@@ -584,8 +592,13 @@ const ChatScreen = () => {
   };
 
   const createNewConversation = async (initialMessage?: ChatMessage): Promise<Conversation | null> => {
-  if (!profileId || !selectedPersonality) {
-    console.error('Profile ID or selected personality missing for new conversation');
+  if (!profileId) {
+    console.error('No profileId available. Cannot create new conversation.');
+    return null;
+  }
+  
+  if (!selectedPersonality) {
+    console.error('No personality selected for new conversation');
     return null;
   }
   setIsLoadingMessages(true);
@@ -637,7 +650,20 @@ const ChatScreen = () => {
 };
 
   const handleSendMessage = async (text: string) => {
-  if (!profileId || !userId || !text.trim()) return;
+  if (!profileId) {
+    console.warn('Cannot send message: No profileId available');
+    return;
+  }
+  
+  if (!userId) {
+    console.warn('Cannot send message: No userId available');
+    return;
+  }
+  
+  if (!text.trim()) {
+    console.log('Empty message, not sending');
+    return;
+  }
 
   let conversationToUse = currentConversation;
   if (!conversationToUse) {
@@ -1109,14 +1135,10 @@ const keyboardVerticalOffset = Platform.OS === 'ios' ? 64 : Platform.OS === 'and
 
 
 
-  // Show the hint only on first login (when profileId changes and user lands on ChatScreen)
-    // useEffect for personality hint (if you re-add it)
-  // useEffect(() => {
-  //   if (profileId) { // Now uses profileId from useAuth()
-  //     setShowPersonalityHint(true);
-  //     personalityHintDismissed.current = false;
-  //   }
-  // }, [profileId]);
+  // Handle gesture responder to prevent touch warnings
+  const handleStartShouldSetResponder = () => true;
+  const handleResponderGrant = () => {};
+  const handleResponderRelease = () => {};
 
   const handleDismissHint = useCallback(() => {
     if (!personalityHintDismissed.current) {
@@ -1133,6 +1155,10 @@ return (
       keyboardVerticalOffset,
       enabled: true,
     } : {})}
+    // Add touch handling to prevent warnings
+    onStartShouldSetResponder={handleStartShouldSetResponder}
+    onResponderGrant={handleResponderGrant}
+    onResponderRelease={handleResponderRelease}
   >
        <Header onPressConversations={() => setShowHistoryModal(true)} />
        {!isOnline && (
