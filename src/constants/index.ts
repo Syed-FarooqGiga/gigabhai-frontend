@@ -68,4 +68,4 @@ export const PERSONALITIES: Record<string, Personality> = {
   }
 };
 
-export const API_URL = 'http://82.29.162.54:8000/chat';
+export const API_URL = 'http://82.29.162.54:8000';
