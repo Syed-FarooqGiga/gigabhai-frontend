@@ -241,7 +241,7 @@ const sendMessageToBackendAndGetResponse = async (
     
     console.log('Sending chat request:', requestBody);
     
-    const response = await fetch(`${API_URL}/chat`, {
+    const response = await fetch(`${API_URL}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -735,7 +735,7 @@ useEffect(() => {
               console.log('Sending TTS request:', ttsRequest);
               
               // Make the TTS request with response type as 'blob' to handle binary data
-              const ttsResponse = await fetch(`${API_URL}/speech/tts`, {
+              const ttsResponse = await fetch(`${API_URL}/api/speech/tts`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
