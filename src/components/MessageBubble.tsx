@@ -2,9 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 
+import type { SenderType } from '../types/chat';
+
 type MessageBubbleProps = {
   text: string;
-  sender: 'user' | 'bot';
+  sender: SenderType;
   personalityEmoji?: string;
 };
 

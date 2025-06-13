@@ -4,14 +4,16 @@ export interface ChatMessage {
   id: string;
   text: string;
   sender: SenderType;
-  timestamp: Date;
+  timestamp: Date | string; // Allow string for Firestore timestamps
   conversationId: string;
   userId: string;
   profileId: string; // Added to support profile-based data isolation
-  personalityId?: string; // Changed from personality for consistency
+  personalityId: string; // Make required for consistency with the app
   avatar?: string;
   isTyping?: boolean;
   error?: boolean;
+  tempId?: string; // Changed to string to store the actual temporary ID
+  isOptimistic?: boolean; // Flag to identify messages that are optimistically added
 }
 
 export interface ChatConversation {
