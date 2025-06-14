@@ -805,6 +805,12 @@ const ChatScreen = () => {
     return text.replace(emojiRegex, '').trim();
   };
 
+  // Check if iOS device
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  
+  // Check if Chrome on iOS
+  const isIOSChrome = isIOS && /CriOS/.test(navigator.userAgent);
+
   // Fallback to Web Speech API with Indian female voice preference
   const fallbackTts = useCallback((text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -817,41 +823,44 @@ const ChatScreen = () => {
     console.log('TTS - Falling back to Web Speech API');
     
     const speakWithVoice = () => {
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel();
+      
       const utterance = new SpeechSynthesisUtterance(text);
       
       // Try to find an Indian English female voice
       const voices = window.speechSynthesis.getVoices();
-      const indianVoice = voices.find(voice => 
-        voice.lang === 'en-IN' && voice.name.toLowerCase().includes('female')
-      );
+      let foundVoice = null;
       
-      // Fallback to any Indian English voice
-      const indianEnglishVoice = voices.find(voice => 
-        voice.lang === 'en-IN' || voice.lang.startsWith('en-IN-')
-      );
+      // For iOS Chrome, we'll let the system handle voice selection
+      if (!isIOSChrome) {
+        foundVoice = voices.find(voice => 
+          voice.lang === 'en-IN' && voice.name.toLowerCase().includes('female')
+        ) || 
+        voices.find(voice => 
+          voice.lang === 'en-IN' || voice.lang.startsWith('en-IN-')
+        ) ||
+        voices.find(voice => 
+          voice.name.toLowerCase().includes('female')
+        );
+      }
       
-      // Fallback to any female voice
-      const femaleVoice = voices.find(voice => 
-        voice.name.toLowerCase().includes('female')
-      );
-      
-      if (indianVoice) {
-        utterance.voice = indianVoice;
-        console.log('Using Indian female voice:', indianVoice.name);
-      } else if (indianEnglishVoice) {
-        utterance.voice = indianEnglishVoice;
-        console.log('Using Indian English voice:', indianEnglishVoice.name);
-      } else if (femaleVoice) {
-        utterance.voice = femaleVoice;
-        console.log('Using female voice:', femaleVoice.name);
+      if (foundVoice) {
+        utterance.voice = foundVoice;
+        console.log('Using voice:', foundVoice.name, 'language:', foundVoice.lang);
       } else if (voices.length > 0) {
+        // On iOS Chrome, just use the first available voice
         utterance.voice = voices[0];
         console.log('Using default voice:', voices[0].name);
       }
       
-      // Set language to Indian English
-      utterance.lang = 'en-IN';
+      // Set language to Indian English if available, otherwise default to en-US
+      utterance.lang = voices.some(v => v.lang.startsWith('en-IN')) ? 'en-IN' : 'en-US';
       
+      // Set a slower rate for better clarity
+      utterance.rate = 0.9;
+      
+      // iOS Chrome requires these events to be set before calling speak()
       utterance.onend = () => {
         console.log('Web Speech - Playback finished');
         setIsTtsPlaying(false);
@@ -864,22 +873,65 @@ const ChatScreen = () => {
         setCurrentAudio(null);
       };
       
-      window.speechSynthesis.speak(utterance);
+      console.log('Starting speech synthesis...');
+      try {
+        // On iOS, we need to ensure the speech happens in response to a user gesture
+        if (isIOS) {
+          // Create a temporary button to trigger speech
+          const tempButton = document.createElement('button');
+          tempButton.style.position = 'absolute';
+          tempButton.style.opacity = '0';
+          tempButton.style.pointerEvents = 'none';
+          document.body.appendChild(tempButton);
+          
+          tempButton.onclick = () => {
+            window.speechSynthesis.speak(utterance);
+            document.body.removeChild(tempButton);
+          };
+          
+          // Trigger the click programmatically
+          tempButton.click();
+        } else {
+          // For non-iOS devices, just speak directly
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (e) {
+        console.error('Error starting speech synthesis:', e);
+        setIsTtsPlaying(false);
+        setCurrentAudio(null);
+      }
     };
     
-    // Load voices if not already loaded
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = speakWithVoice;
-    }
-    
-    // Try to speak immediately if voices are already loaded
-    if (window.speechSynthesis.getVoices().length > 0) {
-      speakWithVoice();
+    // For iOS Chrome, we need to handle voice loading differently
+    if (isIOSChrome) {
+      // On iOS Chrome, we need to wait for a user gesture to load voices
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          speakWithVoice();
+        } else {
+          // If voices aren't loaded yet, try again after a short delay
+          setTimeout(loadVoices, 100);
+        }
+      };
+      
+      // Start loading voices
+      loadVoices();
     } else {
-      // If voices aren't loaded yet, wait a moment and try again
-      setTimeout(speakWithVoice, 1000);
+      // For other browsers, use the standard approach
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = speakWithVoice;
+      }
+      
+      // Try to speak immediately if voices are already loaded
+      if (window.speechSynthesis.getVoices().length > 0) {
+        speakWithVoice();
+      } else {
+        // If voices aren't loaded yet, wait a moment and try again
+        setTimeout(speakWithVoice, 1000);
+      }
     }
-  }, []);
+  }, [isIOS, isIOSChrome]);
 
   // Play a single TTS chunk with improved mobile support and voice preference
   const playTtsChunk = useCallback(async (text: string): Promise<void> => {
