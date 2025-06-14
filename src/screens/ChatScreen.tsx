@@ -805,7 +805,7 @@ const ChatScreen = () => {
     return text.replace(emojiRegex, '').trim();
   };
 
-  // Fallback to Web Speech API
+  // Fallback to Web Speech API with Indian female voice preference
   const fallbackTts = useCallback((text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       console.warn('Web Speech API not available');
@@ -815,30 +815,158 @@ const ChatScreen = () => {
     }
 
     console.log('TTS - Falling back to Web Speech API');
-    const utterance = new SpeechSynthesisUtterance(text);
     
-    utterance.onend = () => {
-      console.log('Web Speech - Playback finished');
-      setIsTtsPlaying(false);
-      setCurrentAudio(null);
+    const speakWithVoice = () => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Try to find an Indian English female voice
+      const voices = window.speechSynthesis.getVoices();
+      const indianVoice = voices.find(voice => 
+        voice.lang === 'en-IN' && voice.name.toLowerCase().includes('female')
+      );
+      
+      // Fallback to any Indian English voice
+      const indianEnglishVoice = voices.find(voice => 
+        voice.lang === 'en-IN' || voice.lang.startsWith('en-IN-')
+      );
+      
+      // Fallback to any female voice
+      const femaleVoice = voices.find(voice => 
+        voice.name.toLowerCase().includes('female')
+      );
+      
+      if (indianVoice) {
+        utterance.voice = indianVoice;
+        console.log('Using Indian female voice:', indianVoice.name);
+      } else if (indianEnglishVoice) {
+        utterance.voice = indianEnglishVoice;
+        console.log('Using Indian English voice:', indianEnglishVoice.name);
+      } else if (femaleVoice) {
+        utterance.voice = femaleVoice;
+        console.log('Using female voice:', femaleVoice.name);
+      } else if (voices.length > 0) {
+        utterance.voice = voices[0];
+        console.log('Using default voice:', voices[0].name);
+      }
+      
+      // Set language to Indian English
+      utterance.lang = 'en-IN';
+      
+      utterance.onend = () => {
+        console.log('Web Speech - Playback finished');
+        setIsTtsPlaying(false);
+        setCurrentAudio(null);
+      };
+      
+      utterance.onerror = (e) => {
+        console.error('Web Speech Error:', e);
+        setIsTtsPlaying(false);
+        setCurrentAudio(null);
+      };
+      
+      window.speechSynthesis.speak(utterance);
     };
     
-    utterance.onerror = (e) => {
-      console.error('Web Speech Error:', e);
-      setIsTtsPlaying(false);
-      setCurrentAudio(null);
-    };
+    // Load voices if not already loaded
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = speakWithVoice;
+    }
     
-    window.speechSynthesis.speak(utterance);
+    // Try to speak immediately if voices are already loaded
+    if (window.speechSynthesis.getVoices().length > 0) {
+      speakWithVoice();
+    } else {
+      // If voices aren't loaded yet, wait a moment and try again
+      setTimeout(speakWithVoice, 1000);
+    }
   }, []);
 
-  // Play a single TTS chunk
+  // Play a single TTS chunk with improved mobile support and voice preference
   const playTtsChunk = useCallback(async (text: string): Promise<void> => {
     if (!text.trim()) return Promise.resolve();
     
+    // First, try Web Speech API as it's more reliable on mobile
+    if ('speechSynthesis' in window && window.speechSynthesis) {
+      return new Promise((resolve) => {
+        console.log('TTS - Using Web Speech API');
+        
+        const speakWithVoice = () => {
+          const utterance = new SpeechSynthesisUtterance(text);
+          const voices = window.speechSynthesis.getVoices();
+          
+          // Try to find an Indian English female voice
+          const indianVoice = voices.find(voice => 
+            voice.lang === 'en-IN' && voice.name.toLowerCase().includes('female')
+          );
+          
+          // Fallback to any Indian English voice
+          const indianEnglishVoice = voices.find(voice => 
+            voice.lang === 'en-IN' || voice.lang.startsWith('en-IN-')
+          );
+          
+          // Fallback to any female voice
+          const femaleVoice = voices.find(voice => 
+            voice.name.toLowerCase().includes('female')
+          );
+          
+          if (indianVoice) {
+            utterance.voice = indianVoice;
+            console.log('Using Indian female voice:', indianVoice.name);
+          } else if (indianEnglishVoice) {
+            utterance.voice = indianEnglishVoice;
+            console.log('Using Indian English voice:', indianEnglishVoice.name);
+          } else if (femaleVoice) {
+            utterance.voice = femaleVoice;
+            console.log('Using female voice:', femaleVoice.name);
+          } else if (voices.length > 0) {
+            utterance.voice = voices[0];
+            console.log('Using default voice:', voices[0].name);
+          }
+          
+          // Set language to Indian English
+          utterance.lang = 'en-IN';
+          
+          utterance.onend = () => {
+            console.log('Web Speech - Playback finished');
+            setIsTtsPlaying(false);
+            setCurrentAudio(null);
+            resolve();
+          };
+          
+          utterance.onerror = (e) => {
+            console.error('Web Speech Error:', e);
+            setIsTtsPlaying(false);
+            setCurrentAudio(null);
+            resolve();
+          };
+          
+          setIsTtsPlaying(true);
+          window.speechSynthesis.speak(utterance);
+        };
+        
+        // Load voices if not already loaded
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+          window.speechSynthesis.onvoiceschanged = speakWithVoice;
+        }
+        
+        // Try to speak immediately if voices are already loaded
+        if (window.speechSynthesis.getVoices().length > 0) {
+          speakWithVoice();
+        } else {
+          // If voices aren't loaded yet, wait a moment and try again
+          setTimeout(speakWithVoice, 1000);
+        }
+      });
+    }
+    
+    // Fallback to our custom TTS service
+    console.log('TTS - Using custom TTS service');
+    
     const ttsRequest = {
       text: text,
-      language: 'en',
+      language: 'en-IN',  // Request Indian English
+      voice: 'female',    // Request female voice
+      rate: 1.0           // Normal speaking rate
     };
     
     console.log('TTS - Sending request:', { length: text.length, preview: text.substring(0, 50) + '...' });
@@ -867,37 +995,55 @@ const ChatScreen = () => {
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         
+        // Preload the audio for better mobile support
+        audio.preload = 'auto';
+        
         const cleanup = () => {
-          audio.removeEventListener('ended', onEnd);
-          audio.removeEventListener('error', onError);
-          URL.revokeObjectURL(audioUrl);
+          audio.pause();
+          audio.src = '';
+          audio.load();
+          setTimeout(() => {
+            URL.revokeObjectURL(audioUrl);
+          }, 1000);
         };
         
         const onEnd = () => {
           console.log('TTS - Chunk playback finished');
           cleanup();
+          setIsTtsPlaying(false);
+          setCurrentAudio(null);
           resolve();
         };
         
         const onError = (e: any) => {
           console.error('TTS - Playback error:', e);
           cleanup();
+          setIsTtsPlaying(false);
           fallbackTts(text);
           resolve();
         };
         
-        audio.addEventListener('ended', onEnd);
-        audio.addEventListener('error', onError);
+        audio.addEventListener('ended', onEnd, { once: true });
+        audio.addEventListener('error', onError, { once: true });
+        
+        // Mobile browsers require user interaction before playing audio
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('TTS - Play error:', error);
+            // On mobile, we might need to handle autoplay restrictions
+            if (error.name === 'NotAllowedError' || error.name === 'NotSupportedError') {
+              console.log('TTS - Autoplay prevented, falling back to Web Speech API');
+              fallbackTts(text);
+            }
+            cleanup();
+            resolve();
+          });
+        }
         
         setCurrentAudio(audio);
         setIsTtsPlaying(true);
-        
-        audio.play().catch(e => {
-          console.error('TTS - Play error:', e);
-          cleanup();
-          fallbackTts(text);
-          resolve();
-        });
       });
     } catch (error) {
       console.error('TTS - Error in playTtsChunk:', error);
