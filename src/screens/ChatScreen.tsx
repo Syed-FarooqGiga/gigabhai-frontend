@@ -504,6 +504,70 @@ const ChatScreen = () => {
   }
 };
 
+// Add real-time message listener
+useEffect(() => {
+  if (!profileId || !currentConversation?.id) return;
+
+  const db = getFirestore();
+  const messagesRef = collection(
+    db,
+    'users',
+    profileId,
+    'conversations',
+    currentConversation.id,
+    'messages'
+  );
+
+  // Query messages ordered by timestamp
+  const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+  // Set up real-time listener
+  const unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      const newMessages: ChatMessage[] = [];
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' || change.type === 'modified') {
+          const data = change.doc.data();
+          const message: ChatMessage = {
+            id: change.doc.id,
+            text: data.text,
+            userId: data.userId,
+            sender: data.sender,
+            timestamp: data.timestamp?.toDate() || new Date(),
+            conversationId: data.conversationId,
+            personalityId: data.personalityId,
+            profileId: data.profileId,
+          };
+          
+          // Only add if we haven't processed this message yet
+          if (!processedMessageIds.current.has(message.id)) {
+            newMessages.push(message);
+            processedMessageIds.current.add(message.id);
+          }
+        }
+      });
+
+      // Update messages state with new messages
+      if (newMessages.length > 0) {
+        setMessages(prevMessages => {
+          // Create a map to avoid duplicates
+          const messageMap = new Map(prevMessages.map(msg => [msg.id, msg]));
+          newMessages.forEach(msg => messageMap.set(msg.id, msg));
+          return Array.from(messageMap.values())
+            .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        });
+      }
+    },
+    (error) => {
+      console.error('Error listening to messages:', error);
+    }
+  );
+
+  // Clean up listener
+  return () => unsubscribe();
+}, [profileId, currentConversation?.id]);
+
 const handleSendMessage = async (text: string) => {
   if (!profileId || !userId || !text.trim()) return;
 
@@ -511,48 +575,31 @@ const handleSendMessage = async (text: string) => {
   const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date();
 
-  // Ensure conversation exists
-  let conversationToUse = currentConversation;
-  if (!conversationToUse) {
-    const newConv = await createNewConversation();
-    if (!newConv) {
-      console.error('Failed to create conversation');
-      return;
-    }
-    conversationToUse = newConv;
-    setCurrentConversation(newConv);
-  }
-
-  const convId = conversationToUse.id;
-
-  const tempUserMessage: ChatMessage = {
-    id: tempId,
-    text: trimmedText,
-    userId,
-    sender: 'user',
-    timestamp: now,
-    personalityId: selectedPersonality.id,
-    profileId,
-    conversationId: convId,
-    isOptimistic: true
-  };
-
-  // Prevent quick duplicates
-  setMessages(prev => {
-    const isRecentDuplicate = prev.some(msg =>
-      msg.sender === 'user' &&
-      msg.text === trimmedText &&
-      Math.abs((msg.timestamp?.getTime() || 0) - now.getTime()) < 1000
-    );
-    if (isRecentDuplicate) return prev;
-
-    return [...prev.filter(msg => !(msg.sender === 'user' && msg.isOptimistic)), tempUserMessage];
-  });
-
-  setInputText('');
-  setIsTyping(true);
-
   try {
+    // Create temp message for optimistic update
+    const tempUserMessage: ChatMessage = {
+      id: tempId,
+      text: trimmedText,
+      userId,
+      sender: 'user',
+      timestamp: now,
+      personalityId: selectedPersonality.id,
+      profileId,
+      conversationId: currentConversation?.id || '',
+      isOptimistic: true
+    };
+
+    // Add temp message to UI
+    setMessages(prev => [...prev, tempUserMessage]);
+
+    // Ensure we have a conversation
+    let conversationToUse = currentConversation;
+    if (!conversationToUse) {
+      const newConv = await createNewConversation(tempUserMessage);
+      if (!newConv) throw new Error('Failed to create conversation');
+      conversationToUse = newConv;
+    }
+
     // Save to Firestore
     const userMessageData: Omit<ChatMessage, 'id'> = {
       text: trimmedText,
@@ -561,69 +608,93 @@ const handleSendMessage = async (text: string) => {
       timestamp: now,
       personalityId: selectedPersonality.id,
       profileId,
-      conversationId: convId
+      conversationId: conversationToUse.id
     };
 
     const db = getFirestore();
-    const userMsgDoc = await addDoc(
-      collection(db, 'users', profileId, 'conversations', convId, 'messages'),
+    await addDoc(
+      collection(db, 'users', profileId, 'conversations', conversationToUse.id, 'messages'),
       userMessageData
     );
 
-    const userMessage: ChatMessage = {
-      ...userMessageData,
-      id: userMsgDoc.id
-    };
-
-    setMessages(prev =>
-      [...prev.filter(msg => msg.id !== tempId), userMessage]
-    );
-
-    processedMessageIds.current.add(userMessage.id);
+    // The real-time listener will handle the update when the message is added
 
     // Get bot response
     const backendResult = await sendMessageToBackendAndGetResponse(
-      userMessage.text,
+      trimmedText,
       selectedPersonality.id,
       profileId,
-      convId,
+      conversationToUse.id,
       userId
     );
 
-    if (backendResult?.message && backendResult.conversationId) {
-      const aiMessage = backendResult.message;
-      if (!aiMessage.id)
-        aiMessage.id = `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Ensure timestamp order
-      let aiTs = new Date(aiMessage.timestamp || Date.now());
-      if (aiTs.getTime() <= now.getTime()) {
-        aiTs = new Date(now.getTime() + 1);
-        aiMessage.timestamp = aiTs;
-      }
-
-      // Update conversation if changed
-      if (backendResult.conversationId !== convId) {
-        const updatedConv = {
-          ...conversationToUse,
-          id: backendResult.conversationId
-        };
-        setCurrentConversation(updatedConv);
-      }
-
-      // Append bot message
-      setMessages(prev => [...prev.filter(m => m.id !== aiMessage.id), aiMessage]);
-      processedMessageIds.current.add(aiMessage.id);
-    } else {
-      console.warn('No valid AI message returned.');
+    if (backendResult?.message) {
+      // The real-time listener will handle the AI response
+      return;
     }
 
-  } catch (err) {
-    console.error('Error during send:', err);
+  } catch (error) {
+    console.error('Error in handleSendMessage:', error);
+    // Remove the temp message on error
     setMessages(prev => prev.filter(msg => msg.id !== tempId));
     Alert.alert('Error', 'Failed to send message. Please try again.');
-  } finally {
-    setIsTyping(false);
+  }
+};
+
+const sendMessageToBackendAndGetResponse = async (
+  text: string,
+  personalityId: string,
+  profileId: string,
+  conversationId: string,
+  userId: string
+) => {
+  try {
+    const idToken = await getAuth().currentUser?.getIdToken();
+    if (!idToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        message: text,
+        personality: personalityId,
+        profile_id: profileId,
+        conversation_id: conversationId,
+        user_id: userId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to get response from server');
+    }
+
+    const data = await response.json();
+    if (data.status !== 'success') {
+      throw new Error(data.error || 'Invalid response from server');
+    }
+
+    return {
+      message: {
+        id: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        text: data.message,
+        sender: 'ai',
+        timestamp: new Date(),
+        conversationId,
+        userId: 'ai',
+        profileId,
+        personalityId,
+      },
+      conversationId: data.conversation_id || conversationId,
+    };
+  } catch (error) {
+    console.error('Error in sendMessageToBackendAndGetResponse:', error);
+    throw error;
   }
 };
 
