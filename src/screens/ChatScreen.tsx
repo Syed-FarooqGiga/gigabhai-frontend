@@ -496,20 +496,27 @@ const ChatScreen = () => {
   const handleSendMessage = async (text: string) => {
     if (!profileId || !userId || !text.trim()) return;
 
+    console.log('Sending message:', { text, profileId, userId });
+
     // Generate a temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date();
 
+    // Ensure we have a conversation
     let conversationToUse = currentConversation;
     if (!conversationToUse) {
+      console.log('No current conversation, creating a new one...');
       const newConv = await createNewConversation();
       if (!newConv) {
-        console.error('Failed to create or get a conversation to send message.');
+        console.error('Failed to create a new conversation');
         return;
       }
       conversationToUse = newConv;
+      setCurrentConversation(newConv);
     }
+    
     const convId = conversationToUse.id;
-    const now = new Date();
+    console.log('Using conversation ID:', convId);
 
     // Create temporary user message for optimistic update
     const tempUserMessage: ChatMessage = {
@@ -521,7 +528,7 @@ const ChatScreen = () => {
       personalityId: selectedPersonality.id,
       profileId,
       conversationId: convId,
-      isOptimistic: true // Mark as optimistic update
+      isOptimistic: true
     };
 
     // Add temporary message to state immediately for optimistic update
@@ -535,9 +542,11 @@ const ChatScreen = () => {
       );
 
       if (recentDuplicate) {
-        return prev; // Skip adding if this is a duplicate
+        console.log('Skipping duplicate message');
+        return prev;
       }
 
+      console.log('Adding temporary message to UI');
       // Filter out any existing temporary messages from this user
       const filtered = prev.filter(msg => !(msg.sender === 'user' && 'isOptimistic' in msg));
       return [...filtered, tempUserMessage];
@@ -545,6 +554,13 @@ const ChatScreen = () => {
 
     setInputText('');
     setIsTyping(true);
+    
+    // Scroll to bottom after adding the message
+    setTimeout(() => {
+      if (flatListRef.current) {
+        flatListRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
 
     try {
       // Save the user message to Firestore
@@ -1458,32 +1474,45 @@ const ChatScreen = () => {
         ref={flatListRef}
         data={isTyping ? [...messages, { id: 'typing-indicator', text: '', sender: 'assistant' as const, personalityId: selectedPersonality.id || 'default', userId: 'ai', timestamp: new Date(), conversationId: currentConversation?.id || '', profileId: profileId || '' }] : messages}
         keyExtractor={(item: ChatMessage, index) => {
-          // For optimistic messages, include index in key to ensure uniqueness
+          if (item.id === 'typing-indicator') return 'typing-indicator';
           if ('isOptimistic' in item && item.isOptimistic) {
-            return `temp-${item.id}-${index}-${Date.now()}`;
+            return `temp-${item.id}-${index}`;
           }
-          // For regular messages, use ID with prefix, sender, and timestamp
           const timestamp = item.timestamp instanceof Date ? item.timestamp.getTime() :
             typeof item.timestamp === 'string' ? new Date(item.timestamp).getTime() :
               Date.now();
-          return `msg-${item.id}-${item.sender}-${timestamp}-${index}`;
+          return `msg-${item.id}-${item.sender}-${timestamp}`;
         }}
         renderItem={({ item }: { item: ChatMessage }) => {
           if (item.id === 'typing-indicator') {
-            // Show animated three-dot bubble as bot reply placeholder
             return <TypingBubble />;
           }
           return (
             <MessageBubble
+              key={`${item.id}-${item.timestamp}`}
               text={item.text}
               sender={item.sender}
-              personalityEmoji={item.sender === 'bot' && PERSONALITIES[item.personalityId || 'default']?.emoji ? PERSONALITIES[item.personalityId || 'default'].emoji : undefined}
+              personalityEmoji={item.sender === 'assistant' && PERSONALITIES[item.personalityId || 'default']?.emoji ? PERSONALITIES[item.personalityId || 'default'].emoji : undefined}
             />
           );
         }}
         style={[styles.messageList, { flex: 1 }]}
-        // Fix: Ensure content grows to fill and pushes input to bottom, prevents blank space below input
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 0, paddingTop: 0 }}
+        contentContainerStyle={{ 
+          flexGrow: 1, 
+          justifyContent: 'flex-end', 
+          paddingBottom: 0, 
+          paddingTop: 0 
+        }}
+        onContentSizeChange={() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }
+        }}
+        onLayout={() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToEnd({ animated: false });
+          }
+        }}
         ListEmptyComponent={() => (
           !isLoadingMessages && (
             <Text style={styles.emptyText}>
@@ -1491,6 +1520,10 @@ const ChatScreen = () => {
             </Text>
           )
         )}
+        removeClippedSubviews={false}
+        initialNumToRender={50}
+        maxToRenderPerBatch={10}
+        windowSize={21}
       />
       <View style={[styles.inputContainer, { marginBottom: Platform.OS === 'ios' ? 8 : Platform.OS === 'android' ? 4 : 0 }]}>
         <TouchableOpacity
