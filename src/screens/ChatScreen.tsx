@@ -241,7 +241,7 @@ const sendMessageToBackendAndGetResponse = async (
     
     console.log('Sending chat request:', requestBody);
     
-    const response = await fetch(`${API_URL}/chat`, {
+    const response = await fetch(`${API_URL}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
